@@ -1,20 +1,123 @@
+import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { auth } from './firebase';
+import {
+  clearStoredAuthUser,
+  getStoredAuthUser,
+  saveStoredAuthUser,
+} from './utils/storage';
+import LoginScreen from './screens/LoginScreen';
+import HomeScreen from './screens/HomeScreen';
+import SignupScreen from './screens/SignupScreen';
+import ProfileScreen from './screens/Profile';
+import ApplicationScreen from './screens/ApplicationScreen';
+import SearchScreen from './screens/SearchScreen';
+import SavedJobsScreen from './screens/SavedJobsScreen';
+
+const Stack = createNativeStackNavigator();
 
 export default function App() {
+  const [initializing, setInitializing] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u: User | null) => {
+      setUser(u);
+      setInitializing(false);
+
+      if (u) {
+        void saveStoredAuthUser(u);
+      } else {
+        void clearStoredAuthUser();
+      }
+    });
+
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || initializing || !user) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const enforceStoredSession = async () => {
+      const storedUser = await getStoredAuthUser();
+
+      if (cancelled) {
+        return;
+      }
+
+      const storedUid = storedUser?.uid ?? null;
+
+      if (!storedUid || storedUid !== user.uid) {
+        try {
+          await signOut(auth);
+        } catch (error) {
+          console.error('Session sync error', error);
+        }
+      }
+    };
+
+    void enforceStoredSession();
+    const intervalId = setInterval(() => {
+      void enforceStoredSession();
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [initializing, user]);
+
+  if (initializing) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#1a365d" />
+        <Text style={styles.loadingText}>Restoring your session</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {user ? (
+          <>
+            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="Search" component={SearchScreen} />
+            <Stack.Screen name="Saved" component={SavedJobsScreen} />
+            <Stack.Screen name="Application" component={ApplicationScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+          </>
+        ) : (
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="SignUp" component={SignupScreen} />
+          </>
+        )}
+      </Stack.Navigator>
       <StatusBar style="auto" />
-    </View>
+    </NavigationContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  loadingContainer: {
     flex: 1,
-    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#f9f9ff',
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#1a365d',
+    fontWeight: '600',
   },
 });
