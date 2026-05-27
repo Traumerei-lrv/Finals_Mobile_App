@@ -12,14 +12,17 @@ import {
   Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import ProfileScreen from './Profile';
-import SearchScreen from './SearchScreen';
-import ApplicationScreen from './ApplicationScreen';
 import {
   getSavedJobs,
   removeSavedJob,
   saveJob,
 } from '../utils/storage';
+import SidebarMenu from '../components/SidebarMenu';
+import {
+  FEATURED_HOME_JOB,
+  HOME_NEARBY_JOBS,
+  searchJobs,
+} from '../data/jobs';
 
 const { width } = Dimensions.get('window');
 
@@ -63,8 +66,19 @@ const JobSeekerHome = ({ navigation }) => {
   }, []);
 
   const savedJobIds = useMemo(() => new Set(savedJobs.map((job) => job.id)), [savedJobs]);
+  const featuredJob = FEATURED_HOME_JOB ?? JOB_DATA[0];
+  const displayedJobs = useMemo(() => {
+    const fallbackJobs = HOME_NEARBY_JOBS.length ? HOME_NEARBY_JOBS : JOB_DATA;
+    const normalizedQuery = search.trim();
+    if (!normalizedQuery) {
+      return fallbackJobs;
+    }
 
-  const getJobId = (job) => [job.role, job.company, job.location].join('|').toLowerCase();
+    const matches = searchJobs(normalizedQuery);
+    return matches.length ? matches.slice(0, 6) : fallbackJobs;
+  }, [search]);
+
+  const getJobId = (job) => job.id ?? [job.role, job.company, job.location].join('|').toLowerCase();
 
   const handleToggleSaveJob = async (job) => {
     const jobId = getJobId(job);
@@ -90,40 +104,13 @@ const JobSeekerHome = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {sidebarOpen ? <TouchableOpacity style={styles.sidebarBackdrop} activeOpacity={1} onPress={handleCloseSidebar} /> : null}
-      <View style={[styles.sidebar, sidebarOpen && styles.sidebarOpen]}>
-        <View style={styles.sidebarHeader}>
-          <Text style={styles.sidebarTitle}>Menu</Text>
-          <TouchableOpacity onPress={handleCloseSidebar}>
-            <MaterialCommunityIcons name="close" size={22} color={COLORS.primary} />
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity style={styles.sidebarItem} onPress={() => navigateFromSidebar('Home')}>
-          <MaterialCommunityIcons name="home-outline" size={20} color={COLORS.primary} />
-          <Text style={styles.sidebarItemText}>Home</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.sidebarItem} onPress={() => navigateFromSidebar('Search')}>
-          <MaterialCommunityIcons name="magnify" size={20} color={COLORS.primary} />
-          <Text style={styles.sidebarItemText}>Search</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.sidebarItem} onPress={() => navigateFromSidebar('Saved')}>
-          <MaterialCommunityIcons name="bookmark-outline" size={20} color={COLORS.primary} />
-          <Text style={styles.sidebarItemText}>Saved</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.sidebarItem} onPress={() => navigateFromSidebar('Application')}>
-          <MaterialCommunityIcons name="file-document-outline" size={20} color={COLORS.primary} />
-          <Text style={styles.sidebarItemText}>Applications</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.sidebarItem} onPress={() => navigateFromSidebar('Profile')}>
-          <MaterialCommunityIcons name="account-outline" size={20} color={COLORS.primary} />
-          <Text style={styles.sidebarItemText}>Profile</Text>
-        </TouchableOpacity>
-      </View>
+      <SidebarMenu
+        isOpen={sidebarOpen}
+        onClose={handleCloseSidebar}
+        navigation={navigation}
+        activeRoute="Home"
+        onItemPress={(item) => navigateFromSidebar(item.route)}
+      />
 
       {/* Top App Bar */}
       <View style={styles.header}>
@@ -149,7 +136,7 @@ const JobSeekerHome = ({ navigation }) => {
               onChangeText={setSearch}
             />
           </View>
-          <TouchableOpacity style={styles.filterButton}>
+          <TouchableOpacity style={styles.filterButton} onPress={() => navigation.navigate('Search')}>
             <Text style={styles.filterButtonText}>Find Jobs</Text>
           </TouchableOpacity>
         </View>
@@ -177,17 +164,23 @@ const JobSeekerHome = ({ navigation }) => {
                 <MaterialCommunityIcons name="google" size={24} color={COLORS.white} />
               </View>
               <View>
-                <Text style={styles.featuredRole}>Senior Product Designer</Text>
-                <Text style={styles.featuredCompany}>Google • Mountain View, CA</Text>
+                <Text style={styles.featuredRole}>{featuredJob?.role ?? 'Senior Product Designer'}</Text>
+                <Text style={styles.featuredCompany}>
+                  {featuredJob?.company ?? 'Google'} • {featuredJob?.location ?? 'Mountain View, CA'}
+                </Text>
               </View>
             </View>
             <View style={styles.tagRow}>
-              <View style={styles.tag}><Text style={styles.tagText}>FULL-TIME</Text></View>
-              <View style={styles.tag}><Text style={styles.tagText}>REMOTE FRIENDLY</Text></View>
+              {(featuredJob?.tags ?? ['FULL-TIME', 'REMOTE FRIENDLY']).slice(0, 2).map((tag) => (
+                <View key={tag} style={styles.tag}><Text style={styles.tagText}>{tag}</Text></View>
+              ))}
             </View>
             <View style={styles.featuredFooter}>
-              <Text style={styles.salaryText}>$180k - $240k</Text>
-              <TouchableOpacity style={styles.applyButton}>
+              <Text style={styles.salaryText}>{featuredJob?.salary ?? '$180k - $240k'}</Text>
+              <TouchableOpacity
+                style={styles.applyButton}
+                onPress={() => navigation.navigate('JobDetails', { job: featuredJob })}
+              >
                 <Text style={styles.applyButtonText}>Apply Now</Text>
               </TouchableOpacity>
             </View>
@@ -207,8 +200,12 @@ const JobSeekerHome = ({ navigation }) => {
         </View>
 
         <View style={styles.jobList}>
-          {JOB_DATA.map((job) => (
-            <TouchableOpacity key={job.id} style={styles.jobCard}>
+          {displayedJobs.map((job) => (
+            <TouchableOpacity
+              key={job.id}
+              style={styles.jobCard}
+              onPress={() => navigation.navigate('JobDetails', { job })}
+            >
               <View style={styles.jobCardHeader}>
                 <View style={[styles.jobIconContainer, { backgroundColor: job.color }]}>
                   <MaterialCommunityIcons name={job.icon} size={20} color={COLORS.white} />
@@ -229,10 +226,10 @@ const JobSeekerHome = ({ navigation }) => {
               </View>
               <View style={styles.jobCardFooter}>
                 <Text style={styles.postedText}>{job.posted}</Text>
-                <View style={styles.detailsLink}>
+                <TouchableOpacity style={styles.detailsLink} onPress={() => navigation.navigate('JobDetails', { job })}>
                   <Text style={styles.detailsLinkText}>Details</Text>
                   <MaterialCommunityIcons name="arrow-right" size={14} color={COLORS.primary} />
-                </View>
+                </TouchableOpacity>
               </View>
             </TouchableOpacity>
           ))}

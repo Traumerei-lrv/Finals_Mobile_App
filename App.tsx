@@ -17,6 +17,13 @@ import ProfileScreen from './screens/Profile';
 import ApplicationScreen from './screens/ApplicationScreen';
 import SearchScreen from './screens/SearchScreen';
 import SavedJobsScreen from './screens/SavedJobsScreen';
+import JobDetailsScreen from './screens/JobDetailsScreen';
+import SubmitApplicationScreen from './screens/SubmitApplication';
+import ApplicationSubmittedScreen from './screens/ApplicationSubmitted';
+import TrackApplicationScreen from './screens/TrackApplication';
+import EditProfileScreen from './screens/EditProfileScreen';
+import ResumeSettingsScreen from './screens/ResumeSettings';
+import PrivacySettingsScreen from './screens/PrivacySettingsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -94,6 +101,13 @@ export default function App() {
             <Stack.Screen name="Saved" component={SavedJobsScreen} />
             <Stack.Screen name="Application" component={ApplicationScreen} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="JobDetails" component={JobDetailsScreen} />
+            <Stack.Screen name="SubmitApplication" component={SubmitApplicationScreen} />
+            <Stack.Screen name="ApplicationSubmitted" component={ApplicationSubmittedScreen} />
+            <Stack.Screen name="TrackApplication" component={TrackApplicationScreen} />
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+            <Stack.Screen name="ResumeSettings" component={ResumeSettingsScreen} />
+            <Stack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />
           </>
         ) : (
           <>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -11,6 +11,8 @@ import {
   Animated,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { getAppliedJobs } from '../utils/storage';
+import SidebarMenu from '../components/SidebarMenu';
 
 const { width } = Dimensions.get('window');
 
@@ -150,14 +152,79 @@ const APPLICATIONS = [
   },
 ];
 
+function mapAppliedJobToApplication(job) {
+  const now = new Date();
+  const appliedDate = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+  return {
+    id: `submitted-${job.id}`,
+    role: job.role,
+    company: job.company,
+    date: `Applied ${appliedDate}`,
+    status: 'UNDER REVIEW',
+    statusType: 'review',
+    step: 'Step 1 of 4',
+    progress: 0.25,
+    icon: job.icon ?? 'file-document-outline',
+    location: job.location ?? 'Remote',
+    salary: job.salary ?? 'Competitive',
+    salaryPeriod: job.salaryPeriod ?? '/ year',
+    tags: Array.isArray(job.tags) && job.tags.length ? job.tags : [job.type ?? 'FULL-TIME'],
+    about:
+      job.about ??
+      `${job.company} is reviewing your application for ${job.role}. We will share the next steps soon.`,
+    responsibilities: Array.isArray(job.responsibilities) && job.responsibilities.length
+      ? job.responsibilities
+      : ['Application submitted successfully.', 'Awaiting recruiter review.'],
+    qualifications: Array.isArray(job.qualifications) && job.qualifications.length
+      ? job.qualifications
+      : ['Profile submitted', 'Resume uploaded'],
+  };
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 const MyApplicationsScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('All');
   const [selectedJob, setSelectedJob] = useState(null);
+  const [submittedApplications, setSubmittedApplications] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const tabs = ['All', 'Active', 'Interviews', 'Archive'];
 
-  const filteredApps = APPLICATIONS.filter((app) => {
+  useEffect(() => {
+    let isMounted = true;
+
+    const hydrateAppliedJobs = async () => {
+      const appliedJobs = await getAppliedJobs();
+      if (isMounted) {
+        setSubmittedApplications(appliedJobs.map(mapAppliedJobToApplication));
+      }
+    };
+
+    void hydrateAppliedJobs();
+
+    const focusUnsubscribe = navigation.addListener('focus', () => {
+      void hydrateAppliedJobs();
+    });
+
+    return () => {
+      isMounted = false;
+      focusUnsubscribe();
+    };
+  }, [navigation]);
+
+  const allApplications = useMemo(
+    () => [...submittedApplications, ...APPLICATIONS],
+    [submittedApplications],
+  );
+  const handleOpenSidebar = () => setSidebarOpen(true);
+  const handleCloseSidebar = () => setSidebarOpen(false);
+  const navigateFromSidebar = (routeName) => {
+    handleCloseSidebar();
+    navigation.navigate(routeName);
+  };
+
+  const filteredApps = allApplications.filter((app) => {
     if (activeTab === 'All') return true;
     if (activeTab === 'Active') return app.statusType === 'review';
     if (activeTab === 'Interviews') return app.statusType === 'interview';
@@ -177,9 +244,16 @@ const MyApplicationsScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <SidebarMenu
+        isOpen={sidebarOpen}
+        onClose={handleCloseSidebar}
+        navigation={navigation}
+        activeRoute="Application"
+        onItemPress={(item) => navigateFromSidebar(item.route)}
+      />
       {/* Top App Bar */}
       <View style={styles.header}>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={handleOpenSidebar}>
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Applications</Text>
@@ -435,7 +509,10 @@ const JobDetailView = ({ job, onBack, navigation }) => {
           <MaterialCommunityIcons name="bookmark-outline" size={24} color={COLORS.primary} />
         </TouchableOpacity>
         {job.statusType !== 'declined' ? (
-          <TouchableOpacity style={detailStyles.applyButton}>
+          <TouchableOpacity
+            style={detailStyles.applyButton}
+            onPress={() => navigation?.navigate('TrackApplication', { job })}
+          >
             <Text style={detailStyles.applyButtonText}>
               {job.statusType === 'interview' ? 'View Interview Details' : 'Continue Application'}
             </Text>

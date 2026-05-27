@@ -9,13 +9,25 @@ const COLORS = {
 };
 
 const MENU_ITEMS = [
-  { key: 'saved', label: 'Saved Jobs', icon: 'bookmark-outline' },
-  { key: 'applied', label: 'Applied', icon: 'file-document-outline' },
-  { key: 'notifications', label: 'Notifications', icon: 'bell-outline' },
-  { key: 'help', label: 'Help & Support', icon: 'help-circle-outline' },
+  { key: 'home', route: 'Home', label: 'Home', icon: 'home-outline' },
+  { key: 'search', route: 'Search', label: 'Search', icon: 'magnify' },
+  { key: 'saved', route: 'Saved', label: 'Saved Jobs', icon: 'bookmark-outline' },
+  { key: 'application', route: 'Application', label: 'Applications', icon: 'file-document-outline' },
+  { key: 'profile', route: 'Profile', label: 'Profile', icon: 'account-outline' },
 ];
 
-export default function SidebarMenu({ isOpen, onClose, onItemPress }) {
+export default function SidebarMenu({ isOpen, onClose, navigation, activeRoute, onItemPress }) {
+  const handlePress = (item) => {
+    if (typeof onItemPress === 'function') {
+      onItemPress(item);
+      return;
+    }
+
+    if (navigation?.navigate && item.route) {
+      navigation.navigate(item.route);
+    }
+  };
+
   return (
     <>
       {isOpen ? <TouchableOpacity style={styles.sidebarBackdrop} activeOpacity={1} onPress={onClose} /> : null}
@@ -28,7 +40,11 @@ export default function SidebarMenu({ isOpen, onClose, onItemPress }) {
         </View>
 
         {MENU_ITEMS.map((item) => (
-          <TouchableOpacity key={item.key} style={styles.sidebarItem} onPress={() => onItemPress(item.key)}>
+          <TouchableOpacity
+            key={item.key}
+            style={[styles.sidebarItem, activeRoute === item.route && styles.sidebarItemActive]}
+            onPress={() => handlePress(item)}
+          >
             <MaterialCommunityIcons name={item.icon} size={20} color={COLORS.primary} />
             <Text style={styles.sidebarItemText}>{item.label}</Text>
           </TouchableOpacity>
@@ -83,6 +99,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 10,
     borderRadius: 12,
+  },
+  sidebarItemActive: {
+    backgroundColor: '#E2E7F9',
   },
   sidebarItemText: {
     fontSize: 15,

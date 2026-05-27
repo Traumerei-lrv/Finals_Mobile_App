@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -15,8 +15,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   clearRecentSearches,
   getRecentSearches,
+  getSavedJobs,
+  removeSavedJob,
+  saveJob,
   saveRecentSearch,
 } from '../utils/storage';
+import { SEARCH_RECOMMENDED_JOBS, searchJobs } from '../data/jobs';
+import SidebarMenu from '../components/SidebarMenu';
 
 const { width } = Dimensions.get('window');
 
@@ -40,9 +45,17 @@ const COLORS = {
   onSecondaryContainer: '#1a365d',
 };
 
-const SearchJobsScreen = ({navigation}) => {
+const SearchJobsScreen = ({navigation, route}) => {
   const [search, setSearch] = useState('');
   const [recentSearches, setRecentSearches] = useState(DEFAULT_RECENT_SEARCHES);
+  const [savedJobs, setSavedJobs] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (route?.params?.query) {
+      setSearch(String(route.params.query));
+    }
+  }, [route?.params?.query]);
 
   useEffect(() => {
     let isMounted = true;
@@ -63,6 +76,27 @@ const SearchJobsScreen = ({navigation}) => {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const hydrateSavedJobs = async () => {
+      const storedSavedJobs = await getSavedJobs();
+      if (isMounted) {
+        setSavedJobs(storedSavedJobs);
+      }
+    };
+
+    void hydrateSavedJobs();
+    const focusUnsubscribe = navigation.addListener('focus', () => {
+      void hydrateSavedJobs();
+    });
+
+    return () => {
+      isMounted = false;
+      focusUnsubscribe();
+    };
+  }, [navigation]);
 
   const handleSearchSubmit = async () => {
     if (!search.trim()) {
@@ -85,11 +119,44 @@ const SearchJobsScreen = ({navigation}) => {
     setRecentSearches([]);
   };
 
+  const getJobId = (job) => job.id ?? [job.role, job.company, job.location].join('|').toLowerCase();
+  const savedJobIds = useMemo(() => new Set(savedJobs.map((job) => job.id)), [savedJobs]);
+  const handleToggleSaveJob = async (job) => {
+    const jobId = getJobId(job);
+    const nextSavedJobs = savedJobIds.has(jobId)
+      ? await removeSavedJob(jobId)
+      : await saveJob(job);
+
+    setSavedJobs(nextSavedJobs);
+  };
+  const handleOpenSidebar = () => setSidebarOpen(true);
+  const handleCloseSidebar = () => setSidebarOpen(false);
+  const navigateFromSidebar = (routeName) => {
+    handleCloseSidebar();
+    navigation.navigate(routeName);
+  };
+
+  const recommendedJobs = useMemo(() => {
+    if (!search.trim()) {
+      return SEARCH_RECOMMENDED_JOBS.slice(0, 9);
+    }
+
+    const results = searchJobs(search);
+    return results.length ? results : SEARCH_RECOMMENDED_JOBS.slice(0, 9);
+  }, [search]);
+
   return (
     <SafeAreaView style={styles.container}>
+      <SidebarMenu
+        isOpen={sidebarOpen}
+        onClose={handleCloseSidebar}
+        navigation={navigation}
+        activeRoute="Search"
+        onItemPress={(item) => navigateFromSidebar(item.route)}
+      />
       {/* Top App Bar */}
       <View style={styles.header}>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={handleOpenSidebar}>
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.logoText}>JobFinder</Text>
@@ -158,29 +225,20 @@ const SearchJobsScreen = ({navigation}) => {
         </View>
 
         <View style={styles.jobList}>
-          <JobCard 
-            role="Senior Product Designer"
-            company="Stripe"
-            location="San Francisco, CA"
-            tags={['FULL TIME', '$140k - $180k', 'HYBRID']}
-            posted="2 days ago"
-          />
-          <JobCard 
-            role="UX Research Lead"
-            company="Google"
-            location="London, UK"
-            tags={['PERMANENT', '$110k - $150k', 'REMOTE']}
-            posted="4 hours ago"
-            urgent
-          />
-          <JobCard 
-            role="Visual Designer"
-            company="Airbnb"
-            location="Remote"
-            tags={['CONTRACT', '$80 - $120 / hr']}
-            posted="1 week ago"
-            applicants="24 Applicants"
-          />
+          {recommendedJobs.map((job) => (
+            <JobCard
+              key={job.id}
+              role={job.role}
+              company={job.company}
+              location={job.location}
+              tags={[job.type, job.salary, ...(job.tags ?? [])].filter(Boolean).slice(0, 3)}
+              posted={job.posted}
+              urgent={job.company === 'Google'}
+              isSaved={savedJobIds.has(getJobId(job))}
+              onToggleSave={() => handleToggleSaveJob(job)}
+              onPress={() => navigation.navigate('JobDetails', { job })}
+            />
+          ))}
         </View>
       </ScrollView>
 
@@ -221,8 +279,8 @@ const CategoryCard = ({ icon, label, count }) => (
   </TouchableOpacity>
 );
 
-const JobCard = ({ role, company, location, tags, posted, urgent, applicants }) => (
-  <TouchableOpacity style={styles.jobCard}>
+const JobCard = ({ role, company, location, tags, posted, urgent, applicants, isSaved, onToggleSave, onPress }) => (
+  <TouchableOpacity style={styles.jobCard} onPress={onPress}>
     <View style={styles.jobCardTop}>
       <View style={styles.companyLogoContainer}>
         <MaterialCommunityIcons name="office-building" size={20} color={COLORS.primary} />
@@ -230,7 +288,13 @@ const JobCard = ({ role, company, location, tags, posted, urgent, applicants }) 
       <View style={styles.jobMainInfo}>
         <View style={styles.jobHeaderRow}>
           <Text style={styles.jobRole}>{role}</Text>
-          <MaterialCommunityIcons name="bookmark-outline" size={20} color={COLORS.secondary} />
+          <TouchableOpacity onPress={onToggleSave}>
+            <MaterialCommunityIcons
+              name={isSaved ? 'bookmark' : 'bookmark-outline'}
+              size={20}
+              color={isSaved ? COLORS.primary : COLORS.secondary}
+            />
+          </TouchableOpacity>
         </View>
         <Text style={styles.jobCompanyLocation}>{company} • {location}</Text>
       </View>

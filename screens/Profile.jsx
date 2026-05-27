@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -13,6 +13,14 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
+import {
+  getAppliedJobs,
+  getProfileSettings,
+  getSavedJobs,
+} from '../utils/storage';
+import { buildProfileAvatarUrl } from '../utils/imageSources';
+import SidebarMenu from '../components/SidebarMenu';
+import LogoutConfirmModal from '../components/LogoutConfirmModal';
 
 
 const { width } = Dimensions.get('window');
@@ -34,19 +42,86 @@ const COLORS = {
 };
 
 const ProfileScreen = ({navigation}) => {
-  const handleLogout = async () => {
+  const [profile, setProfile] = useState({
+    fullName: 'Alex Morgan',
+    headline: 'Senior Product Designer',
+    location: 'Mountain View, CA',
+    about: '',
+    skills: ['UX DESIGN', 'REACT NATIVE', 'FIGMA', 'LEADERSHIP', 'SYSTEMS THINKING'],
+  });
+  const [savedCount, setSavedCount] = useState(0);
+  const [appliedCount, setAppliedCount] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const hydrate = async () => {
+      const [nextProfile, savedJobs, appliedJobs] = await Promise.all([
+        getProfileSettings(),
+        getSavedJobs(),
+        getAppliedJobs(),
+      ]);
+
+      if (!isMounted) {
+        return;
+      }
+
+      setProfile(nextProfile);
+      setSavedCount(savedJobs.length);
+      setAppliedCount(appliedJobs.length);
+    };
+
+    void hydrate();
+
+    const focusUnsubscribe = navigation.addListener('focus', () => {
+      void hydrate();
+    });
+
+    return () => {
+      isMounted = false;
+      focusUnsubscribe();
+    };
+  }, [navigation]);
+
+  const avatarSource = useMemo(
+    () => ({ uri: buildProfileAvatarUrl(profile.fullName || 'Career Go User') }),
+    [profile.fullName],
+  );
+
+  const handleOpenSidebar = () => setSidebarOpen(true);
+  const handleCloseSidebar = () => setSidebarOpen(false);
+  const navigateFromSidebar = (routeName) => {
+    handleCloseSidebar();
+    navigation.navigate(routeName);
+  };
+
+  const handleLogoutConfirm = async () => {
+    setLogoutLoading(true);
     try {
       await signOut(auth);
     } catch (error) {
       console.error('Logout error', error);
+    } finally {
+      setLogoutLoading(false);
+      setLogoutModalVisible(false);
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      <SidebarMenu
+        isOpen={sidebarOpen}
+        onClose={handleCloseSidebar}
+        navigation={navigation}
+        activeRoute="Profile"
+        onItemPress={(item) => navigateFromSidebar(item.route)}
+      />
       {/* Top App Bar */}
       <View style={styles.header}>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={handleOpenSidebar}>
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.logoText}>JobFinder</Text>
@@ -60,18 +135,18 @@ const ProfileScreen = ({navigation}) => {
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
             <Image
-              source={{ uri: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=2070&auto=format&fit=crop' }}
+              source={avatarSource}
               style={styles.avatar}
             />
             <TouchableOpacity style={styles.editAvatarButton}>
               <MaterialCommunityIcons name="pencil" size={16} color={COLORS.white} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.userName}>Alex Morgan</Text>
-          <Text style={styles.userRole}>Senior Product Designer</Text>
+          <Text style={styles.userName}>{profile.fullName}</Text>
+          <Text style={styles.userRole}>{profile.headline}</Text>
           <View style={styles.locationRow}>
             <MaterialCommunityIcons name="map-marker-outline" size={14} color={COLORS.secondary} />
-            <Text style={styles.locationText}>Mountain View, CA</Text>
+            <Text style={styles.locationText}>{profile.location}</Text>
           </View>
         </View>
 
@@ -88,11 +163,11 @@ const ProfileScreen = ({navigation}) => {
           </View>
           <View style={styles.statCardSmallRow}>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>12</Text>
+              <Text style={styles.statValue}>{appliedCount}</Text>
               <Text style={styles.statLabel}>Applications</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>8</Text>
+              <Text style={styles.statValue}>{savedCount}</Text>
               <Text style={styles.statLabel}>Saved Jobs</Text>
             </View>
           </View>
@@ -107,9 +182,7 @@ const ProfileScreen = ({navigation}) => {
             </TouchableOpacity>
           </View>
           <Text style={styles.sectionBody}>
-            Passionate Product Designer with 8+ years of experience in creating user-centric digital experiences. 
-            I specialize in bridging the gap between design and technology, focusing on complex enterprise systems 
-            and mobile applications.
+            {profile.about}
           </Text>
         </View>
 
@@ -146,7 +219,7 @@ const ProfileScreen = ({navigation}) => {
         {/* Skills */}
         <Text style={styles.listSectionTitle}>Skills</Text>
         <View style={styles.skillsCloud}>
-          {['UX DESIGN', 'REACT NATIVE', 'FIGMA', 'LEADERSHIP', 'SYSTEMS THINKING'].map((skill, index) => (
+          {profile.skills.map((skill, index) => (
             <View key={index} style={[styles.skillTag, skill === 'SYSTEMS THINKING' ? styles.skillTagSecondary : styles.skillTagPrimary]}>
               <Text style={[styles.skillTagText, skill === 'SYSTEMS THINKING' ? styles.skillTagTextSecondary : styles.skillTagTextPrimary]}>
                 {skill}
@@ -157,7 +230,7 @@ const ProfileScreen = ({navigation}) => {
 
         {/* Action Links */}
         <View style={styles.actionLinksContainer}>
-          <TouchableOpacity style={styles.actionLink}>
+          <TouchableOpacity style={styles.actionLink} onPress={() => navigation.navigate('EditProfile')}>
             <View style={styles.actionLinkLeft}>
               <MaterialCommunityIcons name="account-edit-outline" size={22} color={COLORS.primary} />
               <Text style={styles.actionLinkText}>Edit Profile</Text>
@@ -165,7 +238,7 @@ const ProfileScreen = ({navigation}) => {
             <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.secondary} />
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.actionLink}>
+          <TouchableOpacity style={styles.actionLink} onPress={() => navigation.navigate('ResumeSettings')}>
             <View style={styles.actionLinkLeft}>
               <MaterialCommunityIcons name="file-document-outline" size={22} color={COLORS.primary} />
               <Text style={styles.actionLinkText}>Resume Settings</Text>
@@ -173,7 +246,7 @@ const ProfileScreen = ({navigation}) => {
             <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.secondary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionLink}>
+          <TouchableOpacity style={styles.actionLink} onPress={() => navigation.navigate('PrivacySettings')}>
             <View style={styles.actionLinkLeft}>
               <MaterialCommunityIcons name="shield-outline" size={22} color={COLORS.primary} />
               <Text style={styles.actionLinkText}>Privacy</Text>
@@ -181,7 +254,7 @@ const ProfileScreen = ({navigation}) => {
             <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.secondary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.actionLink, styles.logoutLink]} onPress={handleLogout}>
+          <TouchableOpacity style={[styles.actionLink, styles.logoutLink]} onPress={() => setLogoutModalVisible(true)}>
             <View style={styles.actionLinkLeft}>
               <MaterialCommunityIcons name="logout" size={22} color="#D32F2F" />
               <Text style={[styles.actionLinkText, { color: '#D32F2F' }]}>Logout</Text>
@@ -211,6 +284,13 @@ const ProfileScreen = ({navigation}) => {
           </View>
         </TouchableOpacity>
       </View>
+
+      <LogoutConfirmModal
+        visible={logoutModalVisible}
+        loading={logoutLoading}
+        onCancel={() => setLogoutModalVisible(false)}
+        onConfirm={handleLogoutConfirm}
+      />
     </SafeAreaView>
   );
 };
