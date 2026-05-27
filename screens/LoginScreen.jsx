@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -13,8 +13,17 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
+import * as Google from 'expo-auth-session/providers/google';
+import {
+  GoogleAuthProvider,
+  signInWithCredential,
+  signInWithEmailAndPassword,
+} from 'firebase/auth';
 import { auth } from '../firebase';
+
+WebBrowser.maybeCompleteAuthSession();
 
 // Design Tokens (Professional Velocity)
 const COLORS = {
@@ -35,6 +44,24 @@ const ReactNativeLogin = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const redirectUri = AuthSession.makeRedirectUri({
+    scheme: 'finalsmobileapp',
+  });
+  const firebaseProjectNumber = '139373810157';
+
+  const getAuthErrorMessage = (prefix, authError) => {
+    const code = authError?.code ? ` (${authError.code})` : '';
+    const message = authError?.message ? `: ${authError.message}` : '';
+    return `${prefix}${code}${message}`;
+  };
+
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    redirectUri,
+  });
 
   const handleSignIn = async () => {
     setError('');
@@ -65,6 +92,82 @@ const ReactNativeLogin = ({ navigation }) => {
       setLoading(false);
     }
   };
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+
+    if (
+      !process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID &&
+      !process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID &&
+      !process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+    ) {
+      setError('Missing Google OAuth client IDs. Add EXPO_PUBLIC_GOOGLE_*_CLIENT_ID in your environment.');
+      return;
+    }
+
+    const providedClientId =
+      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+      process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
+      process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
+      '';
+    const oauthProjectNumber = providedClientId.split('-')[0];
+    if (oauthProjectNumber && oauthProjectNumber !== firebaseProjectNumber) {
+      setError(
+        `Google OAuth client IDs are from project ${oauthProjectNumber}, but Firebase uses project ${firebaseProjectNumber}. Create OAuth client IDs in the same Firebase/Google Cloud project and update EXPO_PUBLIC_GOOGLE_*_CLIENT_ID.`
+      );
+      return;
+    }
+
+    if (!request) {
+      setError('Google sign-in is not ready yet. Please try again in a moment.');
+      return;
+    }
+
+    try {
+      setGoogleLoading(true);
+      void promptAsync({ showInRecents: true }).catch((promptError) => {
+        console.error('Google prompt error', promptError);
+        setError('Unable to start Google Sign-In. Please try again.');
+        setGoogleLoading(false);
+      });
+    } catch (promptError) {
+      console.error('Google prompt error', promptError);
+      setError('Unable to start Google Sign-In. Please try again.');
+      setGoogleLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const signInWithGoogleCredential = async () => {
+      if (!response || response.type !== 'success') {
+        if (response?.type && response.type !== 'dismiss' && response.type !== 'cancel') {
+          console.log('Google auth response type:', response.type);
+        }
+        setGoogleLoading(false);
+        return;
+      }
+
+      const idToken = response.params?.id_token ?? response.authentication?.idToken;
+
+      if (!idToken) {
+        setError('Google Sign-In failed: no ID token returned.');
+        setGoogleLoading(false);
+        return;
+      }
+
+      try {
+        const credential = GoogleAuthProvider.credential(idToken);
+        await signInWithCredential(auth, credential);
+      } catch (authError) {
+        console.error('Google sign in error', authError);
+        setError(getAuthErrorMessage('Google Sign-In failed', authError));
+      } finally {
+        setGoogleLoading(false);
+      }
+    };
+
+    void signInWithGoogleCredential();
+  }, [response]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -146,12 +249,16 @@ const ReactNativeLogin = ({ navigation }) => {
 
             {/* Social Buttons */}
             <View style={styles.socialRow}>
-              <TouchableOpacity style={styles.socialButton}>
+              <TouchableOpacity
+                style={styles.socialButton}
+                onPress={handleGoogleSignIn}
+                disabled={!request || googleLoading}
+              >
                 <Image 
                   source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg' }} 
                   style={styles.socialIcon} 
                 />
-                <Text style={styles.socialText}>Google</Text>
+                <Text style={styles.socialText}>{googleLoading ? 'Signing in...' : 'Google'}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.socialButton}>
                 <MaterialCommunityIcons name="apple" size={20} color="#000" style={styles.socialIcon} />

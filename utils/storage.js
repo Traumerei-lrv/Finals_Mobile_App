@@ -5,8 +5,42 @@ const STORAGE_PREFIX = '@finals_mobile_app/';
 export const STORAGE_KEYS = {
   authUser: `${STORAGE_PREFIX}auth_user`,
   savedJobs: `${STORAGE_PREFIX}saved_jobs`,
+  appliedJobs: `${STORAGE_PREFIX}applied_jobs`,
   recentSearches: `${STORAGE_PREFIX}recent_searches`,
   savedFilters: `${STORAGE_PREFIX}saved_filters`,
+  profileSettings: `${STORAGE_PREFIX}profile_settings`,
+  resumeSettings: `${STORAGE_PREFIX}resume_settings`,
+  privacySettings: `${STORAGE_PREFIX}privacy_settings`,
+};
+
+const DEFAULT_PROFILE_SETTINGS = {
+  fullName: 'Alex Morgan',
+  headline: 'Senior Product Designer',
+  location: 'Mountain View, CA',
+  about:
+    'Passionate Product Designer with 8+ years of experience in creating user-centric digital experiences.',
+  skills: ['UX DESIGN', 'REACT NATIVE', 'FIGMA', 'LEADERSHIP', 'SYSTEMS THINKING'],
+};
+
+const DEFAULT_RESUME_SETTINGS = {
+  resumeName: 'Alex_Morgan_Resume.pdf',
+  resumeUpdatedAt: 'Updated 2 days ago',
+  resumeSize: '2.4 MB',
+  autoFill: true,
+  publicVisibility: true,
+  anonymousBrowsing: false,
+  portfolioLinks: [
+    { id: 'portfolio', label: 'Portfolio', icon: 'briefcase-outline', url: 'https://portfolio.example.com' },
+    { id: 'linkedin', label: 'LinkedIn', icon: 'linkedin', url: 'https://linkedin.com/in/alexmorgan' },
+    { id: 'github', label: 'GitHub', icon: 'github', url: 'https://github.com/alexmorgan' },
+  ],
+};
+
+const DEFAULT_PRIVACY_SETTINGS = {
+  profileVisible: true,
+  recruiterMessages: true,
+  activityStatus: false,
+  shareAnalytics: true,
 };
 
 export async function getStoredJSON(key, fallbackValue) {
@@ -90,6 +124,14 @@ function normalizeSavedJob(job) {
   };
 }
 
+function normalizeAppliedJob(job) {
+  return {
+    ...normalizeSavedJob(job),
+    status: job.status ?? 'Submitted',
+    appliedAt: job.appliedAt ?? new Date().toISOString(),
+  };
+}
+
 export async function saveJob(job) {
   const savedJob = normalizeSavedJob(job);
   const savedJobs = await getSavedJobs();
@@ -136,6 +178,56 @@ export async function clearSavedJobs() {
   await removeStoredValue(STORAGE_KEYS.savedJobs);
 }
 
+export async function getAppliedJobs() {
+  return getStoredJSON(STORAGE_KEYS.appliedJobs, []);
+}
+
+export async function saveAppliedJob(job) {
+  const appliedJob = normalizeAppliedJob(job);
+  const appliedJobs = await getAppliedJobs();
+  const existingIndex = appliedJobs.findIndex((item) => item.id === appliedJob.id);
+
+  const nextAppliedJobs =
+    existingIndex >= 0
+      ? appliedJobs.map((item, index) =>
+          index === existingIndex
+            ? { ...item, ...appliedJob, appliedAt: item.appliedAt }
+            : item,
+        )
+      : [appliedJob, ...appliedJobs];
+
+  await setStoredJSON(STORAGE_KEYS.appliedJobs, nextAppliedJobs);
+  return nextAppliedJobs;
+}
+
+export async function updateAppliedJob(jobId, updates) {
+  const appliedJobs = await getAppliedJobs();
+  const nextAppliedJobs = appliedJobs.map((item) =>
+    item.id === jobId
+      ? {
+          ...item,
+          ...updates,
+          updatedAt: new Date().toISOString(),
+        }
+      : item,
+  );
+
+  await setStoredJSON(STORAGE_KEYS.appliedJobs, nextAppliedJobs);
+  return nextAppliedJobs;
+}
+
+export async function removeAppliedJob(jobId) {
+  const appliedJobs = await getAppliedJobs();
+  const nextAppliedJobs = appliedJobs.filter((item) => item.id !== jobId);
+
+  await setStoredJSON(STORAGE_KEYS.appliedJobs, nextAppliedJobs);
+  return nextAppliedJobs;
+}
+
+export async function clearAppliedJobs() {
+  await removeStoredValue(STORAGE_KEYS.appliedJobs);
+}
+
 export async function getRecentSearches() {
   return getStoredJSON(STORAGE_KEYS.recentSearches, []);
 }
@@ -170,4 +262,53 @@ export async function getSavedFilters() {
 export async function saveSavedFilters(filters) {
   await setStoredJSON(STORAGE_KEYS.savedFilters, filters);
   return filters;
+}
+
+export async function getProfileSettings() {
+  const settings = await getStoredJSON(STORAGE_KEYS.profileSettings, DEFAULT_PROFILE_SETTINGS);
+  return { ...DEFAULT_PROFILE_SETTINGS, ...settings };
+}
+
+export async function saveProfileSettings(settings) {
+  const nextSettings = {
+    ...DEFAULT_PROFILE_SETTINGS,
+    ...settings,
+    skills: Array.isArray(settings?.skills) ? settings.skills : DEFAULT_PROFILE_SETTINGS.skills,
+  };
+  await setStoredJSON(STORAGE_KEYS.profileSettings, nextSettings);
+  return nextSettings;
+}
+
+export async function getResumeSettings() {
+  const settings = await getStoredJSON(STORAGE_KEYS.resumeSettings, DEFAULT_RESUME_SETTINGS);
+  return {
+    ...DEFAULT_RESUME_SETTINGS,
+    ...settings,
+    portfolioLinks: Array.isArray(settings?.portfolioLinks)
+      ? settings.portfolioLinks
+      : DEFAULT_RESUME_SETTINGS.portfolioLinks,
+  };
+}
+
+export async function saveResumeSettings(settings) {
+  const nextSettings = {
+    ...DEFAULT_RESUME_SETTINGS,
+    ...settings,
+    portfolioLinks: Array.isArray(settings?.portfolioLinks)
+      ? settings.portfolioLinks
+      : DEFAULT_RESUME_SETTINGS.portfolioLinks,
+  };
+  await setStoredJSON(STORAGE_KEYS.resumeSettings, nextSettings);
+  return nextSettings;
+}
+
+export async function getPrivacySettings() {
+  const settings = await getStoredJSON(STORAGE_KEYS.privacySettings, DEFAULT_PRIVACY_SETTINGS);
+  return { ...DEFAULT_PRIVACY_SETTINGS, ...settings };
+}
+
+export async function savePrivacySettings(settings) {
+  const nextSettings = { ...DEFAULT_PRIVACY_SETTINGS, ...settings };
+  await setStoredJSON(STORAGE_KEYS.privacySettings, nextSettings);
+  return nextSettings;
 }

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import BottomNav from '../components/BottomNav';
+import { removeAppliedJob } from '../utils/storage';
 
 const { width } = Dimensions.get('window');
 
@@ -33,6 +34,14 @@ const COLORS = {
 
 const TrackApplicationScreen = ({ navigation, route }) => {
   const job = route?.params?.job ?? null;
+  const handleWithdrawApplication = async () => {
+    if (job?.id) {
+      await removeAppliedJob(job.id);
+    }
+
+    navigation.navigate('Application');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Top App Bar */}
@@ -131,7 +140,7 @@ const TrackApplicationScreen = ({ navigation, route }) => {
         <View style={styles.section}>
           <Text style={styles.sectionHeaderLabel}>MANAGE APPLICATION</Text>
           <View style={styles.card}>
-            <TouchableOpacity style={styles.dangerAction}>
+            <TouchableOpacity style={styles.dangerAction} onPress={handleWithdrawApplication}>
               <MaterialCommunityIcons name="close-circle-outline" size={24} color={COLORS.error} />
               <Text style={styles.dangerActionText}>Withdraw Application</Text>
             </TouchableOpacity>
