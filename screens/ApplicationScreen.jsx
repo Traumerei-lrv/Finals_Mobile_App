@@ -11,7 +11,11 @@ import {
   Animated,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { getAppliedJobs } from '../utils/storage';
+import { auth } from '../firebase';
+import {
+  mapApplicationToJobSeekerCard,
+  subscribeToApplicantApplications,
+} from '../utils/applicationsFirestore';
 import SidebarMenu from '../components/SidebarMenu';
 
 const { width } = Dimensions.get('window');
@@ -33,190 +37,45 @@ const COLORS = {
   statusReview: '#e2e7f9',
   statusDeclined: '#FEE2E2',
   statusDeclinedText: '#B91C1C',
+  statusWithdrawn: '#FFF1F2',
+  statusWithdrawnText: '#BE123C',
+  error: '#B91C1C',
   tagBg: '#E2E7F9',
 };
 
-// ─── Sample job data ──────────────────────────────────────────────────────────
-const APPLICATIONS = [
-  {
-    id: '1',
-    role: 'Senior Product Designer',
-    company: 'StellarTech Solutions',
-    date: 'Applied Oct 12, 2023',
-    status: 'INTERVIEW SCHEDULED',
-    statusType: 'interview',
-    step: 'Step 3 of 4',
-    progress: 0.75,
-    icon: 'molecule',
-    location: 'San Francisco, CA',
-    salary: '$160k – $200k',
-    salaryPeriod: '/ year',
-    tags: ['FULL-TIME', 'HYBRID', 'DESIGN'],
-    about:
-      'As a Senior Product Designer at StellarTech Solutions, you will craft intuitive, beautiful experiences for millions of users worldwide. Work closely with engineers, PMs, and researchers to solve complex design challenges and ship elegant solutions.',
-    responsibilities: [
-      'Lead end-to-end design for core product features from concept to launch.',
-      'Develop high-fidelity prototypes and design systems that ensure cross-platform consistency.',
-      'Conduct user research and usability testing to validate design decisions.',
-      'Mentor junior designers and contribute to internal design culture.',
-    ],
-    qualifications: [
-      '6+ years of experience in product design or UI/UX.',
-      'Expertise in Figma, Sketch, and Adobe Creative Suite.',
-      'Strong portfolio demonstrating complex problem-solving and visual craft.',
-    ],
-  },
-  {
-    id: '2',
-    role: 'Full-Stack Engineer',
-    company: 'Global Finance Group',
-    date: 'Applied Oct 08, 2023',
-    status: 'UNDER REVIEW',
-    statusType: 'review',
-    step: 'Step 1 of 4',
-    progress: 0.25,
-    icon: 'flash-outline',
-    location: 'New York, NY',
-    salary: '$140k – $180k',
-    salaryPeriod: '/ year',
-    tags: ['FULL-TIME', 'ON-SITE', 'ENGINEERING'],
-    about:
-      'Join the Global Finance Group engineering team to build resilient, high-throughput financial systems serving institutional clients across 40+ countries.',
-    responsibilities: [
-      'Design and build scalable APIs and microservices in Node.js and Go.',
-      'Collaborate with product teams on feature delivery and technical roadmaps.',
-      'Maintain 99.99% uptime for mission-critical transaction pipelines.',
-      'Participate in on-call rotations and incident response.',
-    ],
-    qualifications: [
-      '5+ years full-stack experience (React, Node.js, PostgreSQL).',
-      'Experience with financial systems or high-frequency data pipelines.',
-      'Strong understanding of system design and distributed architectures.',
-    ],
-  },
-  {
-    id: '3',
-    role: 'UX Researcher',
-    company: 'Creative Pulse Agency',
-    date: 'Applied Sep 28, 2023',
-    status: 'DECLINED',
-    statusType: 'declined',
-    step: 'Closed',
-    progress: 1,
-    progressColor: COLORS.outline,
-    icon: 'hexagon-outline',
-    location: 'Austin, TX',
-    salary: '$90k – $120k',
-    salaryPeriod: '/ year',
-    tags: ['FULL-TIME', 'REMOTE', 'RESEARCH'],
-    about:
-      'Creative Pulse Agency was seeking a UX Researcher to drive insight-led design across a portfolio of consumer brands. This position has been filled.',
-    responsibilities: [
-      'Plan and conduct qualitative and quantitative user research studies.',
-      'Synthesise findings into actionable insights for product and design teams.',
-      'Manage the research repository and evangelise a user-centred culture.',
-    ],
-    qualifications: [
-      '3+ years in UX research or a related field.',
-      'Proficiency with tools such as UserTesting, Maze, or Dovetail.',
-      'Excellent written and verbal communication skills.',
-    ],
-  },
-  {
-    id: '4',
-    role: 'Marketing Director',
-    company: 'CloudScale Inc.',
-    date: 'Applied Oct 02, 2023',
-    status: 'UNDER REVIEW',
-    statusType: 'review',
-    step: 'Step 2 of 4',
-    progress: 0.5,
-    icon: 'help-circle-outline',
-    location: 'Seattle, WA',
-    salary: '$170k – $210k',
-    salaryPeriod: '/ year',
-    tags: ['FULL-TIME', 'HYBRID', 'MARKETING'],
-    about:
-      'CloudScale Inc. is looking for a data-driven Marketing Director to own brand strategy, demand generation, and go-to-market execution for our rapidly growing SaaS platform.',
-    responsibilities: [
-      'Define and execute the company-wide marketing strategy and OKRs.',
-      'Lead a team of 12 across content, growth, brand, and product marketing.',
-      'Own the full-funnel demand generation programme and marketing P&L.',
-      'Partner with sales leadership on pipeline targets and ABM campaigns.',
-    ],
-    qualifications: [
-      '8+ years in B2B SaaS marketing, with 3+ years in a leadership role.',
-      'Proven track record of driving pipeline growth and brand awareness.',
-      'Strong analytical skills and comfort with marketing attribution tools.',
-    ],
-  },
-];
-
-function mapAppliedJobToApplication(job) {
-  const now = new Date();
-  const appliedDate = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
-  return {
-    id: `submitted-${job.id}`,
-    role: job.role,
-    company: job.company,
-    date: `Applied ${appliedDate}`,
-    status: 'UNDER REVIEW',
-    statusType: 'review',
-    step: 'Step 1 of 4',
-    progress: 0.25,
-    icon: job.icon ?? 'file-document-outline',
-    location: job.location ?? 'Remote',
-    salary: job.salary ?? 'Competitive',
-    salaryPeriod: job.salaryPeriod ?? '/ year',
-    tags: Array.isArray(job.tags) && job.tags.length ? job.tags : [job.type ?? 'FULL-TIME'],
-    about:
-      job.about ??
-      `${job.company} is reviewing your application for ${job.role}. We will share the next steps soon.`,
-    responsibilities: Array.isArray(job.responsibilities) && job.responsibilities.length
-      ? job.responsibilities
-      : ['Application submitted successfully.', 'Awaiting recruiter review.'],
-    qualifications: Array.isArray(job.qualifications) && job.qualifications.length
-      ? job.qualifications
-      : ['Profile submitted', 'Resume uploaded'],
-  };
-}
-
 // ─── Main screen ──────────────────────────────────────────────────────────────
-const MyApplicationsScreen = ({ navigation }) => {
+const MyApplicationsScreen = ({ navigation, route }) => {
   const [activeTab, setActiveTab] = useState('All');
   const [selectedJob, setSelectedJob] = useState(null);
   const [submittedApplications, setSubmittedApplications] = useState([]);
+  const [dismissedArchiveIds, setDismissedArchiveIds] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const tabs = ['All', 'Active', 'Interviews', 'Archive'];
 
   useEffect(() => {
-    let isMounted = true;
-
-    const hydrateAppliedJobs = async () => {
-      const appliedJobs = await getAppliedJobs();
-      if (isMounted) {
-        setSubmittedApplications(appliedJobs.map(mapAppliedJobToApplication));
-      }
-    };
-
-    void hydrateAppliedJobs();
-
-    const focusUnsubscribe = navigation.addListener('focus', () => {
-      void hydrateAppliedJobs();
+    const applicantId = auth.currentUser?.uid ?? null;
+    const unsubscribe = subscribeToApplicantApplications({
+      applicantId,
+      onData: (applications) => {
+        setSubmittedApplications(applications.map(mapApplicationToJobSeekerCard));
+      },
+      onError: (error) => console.error('Applications subscription error', error),
     });
 
-    return () => {
-      isMounted = false;
-      focusUnsubscribe();
-    };
-  }, [navigation]);
+    return unsubscribe;
+  }, []);
 
-  const allApplications = useMemo(
-    () => [...submittedApplications, ...APPLICATIONS],
-    [submittedApplications],
-  );
+  useEffect(() => {
+    if (route?.params?.initialTab === 'Archive') {
+      setActiveTab('Archive');
+      navigation.setParams({ initialTab: undefined });
+    }
+  }, [navigation, route?.params?.initialTab]);
+
+  const allApplications = useMemo(() => {
+    return submittedApplications.filter((app) => !dismissedArchiveIds.includes(app.id));
+  }, [dismissedArchiveIds, submittedApplications]);
   const handleOpenSidebar = () => setSidebarOpen(true);
   const handleCloseSidebar = () => setSidebarOpen(false);
   const navigateFromSidebar = (routeName) => {
@@ -228,9 +87,13 @@ const MyApplicationsScreen = ({ navigation }) => {
     if (activeTab === 'All') return true;
     if (activeTab === 'Active') return app.statusType === 'review';
     if (activeTab === 'Interviews') return app.statusType === 'interview';
-    if (activeTab === 'Archive') return app.statusType === 'declined';
+    if (activeTab === 'Archive') return app.statusType === 'declined' || app.statusType === 'withdrawn';
     return true;
   });
+
+  const handleDeleteArchivedApp = async (app) => {
+    setDismissedArchiveIds((prev) => [...prev, app.id]);
+  };
 
   if (selectedJob) {
     return (
@@ -287,6 +150,11 @@ const MyApplicationsScreen = ({ navigation }) => {
               key={app.id}
               {...app}
               onPress={() => setSelectedJob(app)}
+              onDelete={
+                app.statusType === 'withdrawn' || app.statusType === 'declined'
+                  ? () => handleDeleteArchivedApp(app)
+                  : null
+              }
             />
           ))}
         </View>
@@ -320,7 +188,7 @@ const MyApplicationsScreen = ({ navigation }) => {
 // ─── Application card ─────────────────────────────────────────────────────────
 const ApplicationCard = ({
   role, company, date, status, statusType, step,
-  progress, progressColor, icon, onPress,
+  progress, progressColor, icon, onPress, onDelete,
 }) => {
   let statusStyle = styles.statusReview;
   let statusTextStyle = styles.statusReviewText;
@@ -330,6 +198,9 @@ const ApplicationCard = ({
   } else if (statusType === 'declined') {
     statusStyle = styles.statusDeclined;
     statusTextStyle = styles.statusDeclinedText;
+  } else if (statusType === 'withdrawn') {
+    statusStyle = styles.statusWithdrawn;
+    statusTextStyle = styles.statusWithdrawnText;
   }
 
   return (
@@ -371,6 +242,12 @@ const ApplicationCard = ({
 
       {/* Tap hint */}
       <View style={styles.viewDetailRow}>
+        {typeof onDelete === 'function' && (
+          <TouchableOpacity style={styles.deleteButton} onPress={onDelete}>
+            <MaterialCommunityIcons name="delete-outline" size={16} color={COLORS.error} />
+            <Text style={styles.deleteButtonText}>Delete</Text>
+          </TouchableOpacity>
+        )}
         <Text style={styles.viewDetailText}>View job details</Text>
         <MaterialCommunityIcons name="chevron-right" size={16} color={COLORS.accentBlue} />
       </View>
@@ -391,6 +268,9 @@ const JobDetailView = ({ job, onBack, navigation }) => {
   } else if (job.statusType === 'declined') {
     statusStyle = styles.statusDeclined;
     statusTextStyle = styles.statusDeclinedText;
+  } else if (job.statusType === 'withdrawn') {
+    statusStyle = styles.statusWithdrawn;
+    statusTextStyle = styles.statusWithdrawnText;
   }
 
   return (
@@ -508,7 +388,7 @@ const JobDetailView = ({ job, onBack, navigation }) => {
         <TouchableOpacity style={detailStyles.saveButton}>
           <MaterialCommunityIcons name="bookmark-outline" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        {job.statusType !== 'declined' ? (
+        {job.statusType !== 'declined' && job.statusType !== 'withdrawn' ? (
           <TouchableOpacity
             style={detailStyles.applyButton}
             onPress={() => navigation?.navigate('TrackApplication', { job })}
@@ -619,6 +499,8 @@ const styles = StyleSheet.create({
   statusReviewText: { color: COLORS.primary },
   statusDeclined: { backgroundColor: COLORS.statusDeclined },
   statusDeclinedText: { color: COLORS.statusDeclinedText },
+  statusWithdrawn: { backgroundColor: COLORS.statusWithdrawn },
+  statusWithdrawnText: { color: COLORS.statusWithdrawnText },
   cardMeta: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -646,7 +528,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     marginTop: 10,
-    gap: 2,
+    gap: 10,
+  },
+  deleteButton: {
+    marginRight: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    backgroundColor: '#FEE2E2',
+  },
+  deleteButtonText: {
+    color: COLORS.error,
+    fontSize: 12,
+    fontWeight: '700',
   },
   viewDetailText: { fontSize: 12, color: COLORS.accentBlue, fontWeight: '600' },
   bottomNav: {

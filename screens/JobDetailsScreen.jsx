@@ -10,9 +10,9 @@ import {
   Image,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { getJobDetails } from '../data/jobs';
+import { auth } from '../firebase';
+import { hasApplicantAppliedToJob } from '../utils/applicationsFirestore';
 import {
-  getAppliedJobs,
   getSavedJobs,
   removeSavedJob,
   saveJob,
@@ -28,7 +28,7 @@ const COLORS = {
 };
 
 export default function JobDetailsScreen({ navigation, route }) {
-  const job = getJobDetails(route?.params?.job);
+  const job = route?.params?.job ?? null;
   const [isSaved, setIsSaved] = useState(false);
   const [isApplied, setIsApplied] = useState(false);
 
@@ -37,12 +37,14 @@ export default function JobDetailsScreen({ navigation, route }) {
 
     const hydrateSavedState = async () => {
       const savedJobs = await getSavedJobs();
-      const appliedJobs = await getAppliedJobs();
       const savedIds = new Set(savedJobs.map((item) => item.id));
-      const appliedIds = new Set(appliedJobs.map((item) => item.id));
       if (isMounted && job) {
+        const applicantId = auth.currentUser?.uid ?? null;
+        const alreadyApplied = applicantId
+          ? await hasApplicantAppliedToJob({ jobId: job.id, applicantId })
+          : false;
         setIsSaved(savedIds.has(job.id));
-        setIsApplied(appliedIds.has(job.id));
+        setIsApplied(alreadyApplied);
       }
     };
 
@@ -99,15 +101,29 @@ export default function JobDetailsScreen({ navigation, route }) {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.heroSection}>
-          <Image source={{ uri: job.imageUrl }} style={styles.heroImage} />
+          <Image
+            source={{
+              uri:
+                job.imageUrl ??
+                'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=1600&auto=format&fit=crop',
+            }}
+            style={styles.heroImage}
+          />
           <View style={styles.companyLogoContainer}>
-            <Image source={{ uri: job.logoUrl }} style={styles.companyLogo} />
+            <Image
+              source={{
+                uri:
+                  job.logoUrl ??
+                  'https://images.unsplash.com/photo-1560179707-f14e90ef3623?q=80&w=300&auto=format&fit=crop',
+              }}
+              style={styles.companyLogo}
+            />
           </View>
           <Text style={styles.jobTitle}>{job.role}</Text>
           <Text style={styles.companyInfo}>{job.company} · {job.location}</Text>
 
           <View style={styles.tagRow}>
-            {job.tags.map((tag) => (
+            {(job.tags ?? [job.type ?? 'Full-time']).map((tag) => (
               <View key={tag} style={styles.tag}>
                 <Text style={styles.tagText}>{tag}</Text>
               </View>
@@ -123,15 +139,18 @@ export default function JobDetailsScreen({ navigation, route }) {
 
         <View style={styles.contentPadding}>
           <Text style={styles.sectionTitle}>About the role</Text>
-          <Text style={styles.sectionBody}>{job.about}</Text>
+          <Text style={styles.sectionBody}>
+            {job.about ??
+              `${job.company} is hiring a ${job.role} to help scale product quality and business impact.`}
+          </Text>
 
           <Text style={styles.sectionTitle}>Responsibilities</Text>
-          {job.responsibilities.map((item, i) => (
+          {(job.responsibilities ?? []).map((item, i) => (
             <RowItem key={`${item}-${i}`} icon="check-circle-outline" text={item} />
           ))}
 
           <Text style={styles.sectionTitle}>Qualifications</Text>
-          {job.qualifications.map((item, i) => (
+          {(job.qualifications ?? []).map((item, i) => (
             <RowItem key={`${item}-${i}`} icon="check-decagram-outline" text={item} />
           ))}
         </View>

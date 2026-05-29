@@ -14,13 +14,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import {
-  getAppliedJobs,
   getProfileSettings,
   getSavedJobs,
 } from '../utils/storage';
 import { buildProfileAvatarUrl } from '../utils/imageSources';
 import SidebarMenu from '../components/SidebarMenu';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
+import { subscribeToApplicantApplications } from '../utils/applicationsFirestore';
 
 
 const { width } = Dimensions.get('window');
@@ -59,10 +59,9 @@ const ProfileScreen = ({navigation}) => {
     let isMounted = true;
 
     const hydrate = async () => {
-      const [nextProfile, savedJobs, appliedJobs] = await Promise.all([
+      const [nextProfile, savedJobs] = await Promise.all([
         getProfileSettings(),
         getSavedJobs(),
-        getAppliedJobs(),
       ]);
 
       if (!isMounted) {
@@ -71,7 +70,6 @@ const ProfileScreen = ({navigation}) => {
 
       setProfile(nextProfile);
       setSavedCount(savedJobs.length);
-      setAppliedCount(appliedJobs.length);
     };
 
     void hydrate();
@@ -85,6 +83,17 @@ const ProfileScreen = ({navigation}) => {
       focusUnsubscribe();
     };
   }, [navigation]);
+
+  useEffect(() => {
+    const applicantId = auth.currentUser?.uid ?? null;
+    const unsubscribe = subscribeToApplicantApplications({
+      applicantId,
+      onData: (applications) => setAppliedCount(applications.length),
+      onError: (error) => console.error('Profile applications subscription error', error),
+    });
+
+    return unsubscribe;
+  }, []);
 
   const avatarSource = useMemo(
     () => ({ uri: buildProfileAvatarUrl(profile.fullName || 'Career Go User') }),
@@ -124,7 +133,7 @@ const ProfileScreen = ({navigation}) => {
         <TouchableOpacity onPress={handleOpenSidebar}>
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        <Text style={styles.logoText}>JobFinder</Text>
+        <Text style={styles.logoText}>Career Go</Text>
         <TouchableOpacity>
           <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
         </TouchableOpacity>

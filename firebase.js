@@ -1,6 +1,8 @@
 // firebase.js
 import { getApps, initializeApp } from 'firebase/app';
 import { getAuth, initializeAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -21,6 +23,9 @@ if (!firebaseConfig.apiKey || !firebaseConfig.apiKey.startsWith('AIza')) {
 }
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+
+export const db = getFirestore(app);
+export const storage = getStorage(app);
 
 export const auth =
   Platform.OS === 'web'

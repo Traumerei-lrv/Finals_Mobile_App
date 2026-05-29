@@ -21,7 +21,7 @@ import {
   signInWithCredential,
   signInWithEmailAndPassword,
 } from 'firebase/auth';
-import { auth } from '../firebase';
+import { auth } from '../../firebase';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -177,7 +177,7 @@ const ReactNativeLogin = ({ navigation }) => {
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.header}>
-            <Text style={styles.title}>Welcome Back</Text>
+            <Text style={styles.title}>Welcome to Career Go</Text>
             <Text style={styles.subtitle}>Sign in to accelerate your career</Text>
           </View>
 
@@ -254,15 +254,11 @@ const ReactNativeLogin = ({ navigation }) => {
                 onPress={handleGoogleSignIn}
                 disabled={!request || googleLoading}
               >
-                <Image 
-                  source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg' }} 
-                  style={styles.socialIcon} 
+                <Image
+                  source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/512px-Google_%22G%22_Logo.svg.png' }}
+                  style={styles.socialIcon}
                 />
                 <Text style={styles.socialText}>{googleLoading ? 'Signing in...' : 'Google'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialButton}>
-                <MaterialCommunityIcons name="apple" size={20} color="#000" style={styles.socialIcon} />
-                <Text style={styles.socialText}>Apple</Text>
               </TouchableOpacity>
             </View>
 

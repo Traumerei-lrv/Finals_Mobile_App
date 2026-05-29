@@ -1,0 +1,196 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function roleFor(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid))
+        ? get(/databases/$(database)/documents/users/$(uid)).data.role
+        : null;
+    }
+
+    function currentRole() {
+      return isSignedIn() ? roleFor(request.auth.uid) : null;
+    }
+
+    function isAdmin() {
+      return currentRole() == 'admin';
+    }
+
+    function isRecruiter() {
+      return currentRole() == 'recruiter' || isAdmin();
+    }
+
+    function validUserRole(role) {
+      return role in ['job_seeker', 'recruiter', 'admin'];
+    }
+
+    function validUserCreatePayload() {
+      return request.resource.data.keys().hasAll(['role']) &&
+        request.resource.data.keys().hasOnly([
+          'fullName',
+          'email',
+          'role',
+          'createdAt',
+          'userRole',
+          'type'
+        ]) &&
+        request.resource.data.role is string &&
+        validUserRole(request.resource.data.role);
+    }
+
+    function validUserUpdatePayload() {
+      return request.resource.data.keys().hasOnly([
+          'fullName',
+          'email',
+          'role',
+          'createdAt',
+          'userRole',
+          'type'
+        ]) &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) ||
+          request.resource.data.role == resource.data.role
+        );
+    }
+
+    function validJobPayload() {
+      return request.resource.data.keys().hasAll([
+          'recruiterId',
+          'role',
+          'company',
+          'location',
+          'salary',
+          'type',
+          'status',
+          'about',
+          'createdAt',
+          'postedAt'
+        ]) &&
+        request.resource.data.keys().hasOnly([
+          'recruiterId',
+          'role',
+          'company',
+          'location',
+          'salary',
+          'salaryPeriod',
+          'type',
+          'tags',
+          'status',
+          'about',
+          'responsibilities',
+          'qualifications',
+          'icon',
+          'color',
+          'imageUrl',
+          'logoUrl',
+          'createdAt',
+          'postedAt'
+        ]) &&
+        request.resource.data.recruiterId == request.auth.uid &&
+        request.resource.data.role is string &&
+        request.resource.data.company is string &&
+        request.resource.data.location is string &&
+        request.resource.data.salary is string &&
+        request.resource.data.type is string &&
+        request.resource.data.about is string &&
+        request.resource.data.status in ['open', 'closed'] &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.postedAt == request.time;
+    }
+
+    function validApplicationCreatePayload() {
+      return request.resource.data.keys().hasAll([
+          'jobId',
+          'recruiterId',
+          'applicantId',
+          'applicantName',
+          'status',
+          'statusType',
+          'appliedAt',
+          'createdAt',
+          'job'
+        ]) &&
+        request.resource.data.keys().hasOnly([
+          'jobId',
+          'recruiterId',
+          'applicantId',
+          'applicantName',
+          'applicantEmail',
+          'applicantPhone',
+          'resumeUrl',
+          'resumePath',
+          'resumeFileName',
+          'screening1',
+          'noticePeriod',
+          'status',
+          'statusType',
+          'appliedAt',
+          'createdAt',
+          'job'
+        ]) &&
+        request.resource.data.applicantId == request.auth.uid &&
+        request.resource.data.status == 'applied' &&
+        request.resource.data.statusType == 'applied' &&
+        request.resource.data.appliedAt == request.time &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.jobId is string &&
+        request.resource.data.recruiterId is string &&
+        exists(/databases/$(database)/documents/jobs/$(request.resource.data.jobId)) &&
+        get(/databases/$(database)/documents/jobs/$(request.resource.data.jobId)).data.recruiterId ==
+          request.resource.data.recruiterId &&
+        get(/databases/$(database)/documents/jobs/$(request.resource.data.jobId)).data.status == 'open';
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && validUserCreatePayload();
+      allow update: if (isOwner(uid) && validUserUpdatePayload()) || isAdmin();
+      allow delete: if false;
+    }
+
+    match /recruiters/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create, update: if isOwner(uid) || isAdmin();
+      allow delete: if false;
+    }
+
+    match /jobs/{jobId} {
+      allow read: if isSignedIn();
+      allow create: if isRecruiter() && validJobPayload();
+      allow update: if isRecruiter() &&
+        resource.data.recruiterId == request.auth.uid &&
+        request.resource.data.recruiterId == resource.data.recruiterId;
+      allow delete: if isRecruiter() && resource.data.recruiterId == request.auth.uid;
+    }
+
+    match /applications/{applicationId} {
+      allow read: if isSignedIn() && (
+        resource.data.applicantId == request.auth.uid ||
+        resource.data.recruiterId == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow create: if isSignedIn() && validApplicationCreatePayload();
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (resource.data.recruiterId == request.auth.uid &&
+         request.resource.data.recruiterId == resource.data.recruiterId &&
+         request.resource.data.applicantId == resource.data.applicantId &&
+         request.resource.data.jobId == resource.data.jobId)
+      );
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

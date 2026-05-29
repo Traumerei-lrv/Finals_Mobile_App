@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import BottomNav from '../components/BottomNav';
-import { removeAppliedJob } from '../utils/storage';
+import { withdrawAppliedJob } from '../utils/storage';
 
 const { width } = Dimensions.get('window');
 
@@ -35,11 +35,14 @@ const COLORS = {
 const TrackApplicationScreen = ({ navigation, route }) => {
   const job = route?.params?.job ?? null;
   const handleWithdrawApplication = async () => {
-    if (job?.id) {
-      await removeAppliedJob(job.id);
+    const sourceJobId =
+      job?.sourceJobId ?? (typeof job?.id === 'string' ? job.id.replace(/^submitted-/, '') : null);
+
+    if (sourceJobId) {
+      await withdrawAppliedJob(sourceJobId);
     }
 
-    navigation.navigate('Application');
+    navigation.navigate('Application', { initialTab: 'Archive' });
   };
 
   return (

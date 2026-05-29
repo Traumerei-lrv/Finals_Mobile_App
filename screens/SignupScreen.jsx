@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 // Design Tokens (Professional Velocity)
 const COLORS = {
@@ -59,7 +60,40 @@ const ReactNativeSignUp = ({navigation}) => {
 
     setLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const selectedRole = role === 'recruiter' ? 'recruiter' : 'job_seeker';
+
+      // Ensure users/{uid} document exists so client role reads succeed immediately
+      try {
+        const uid = userCredential.user?.uid ?? auth.currentUser?.uid;
+        if (uid) {
+          await setDoc(doc(db, 'users', uid), {
+            fullName: fullName.trim(),
+            email: email.trim().toLowerCase(),
+            role: selectedRole,
+            createdAt: serverTimestamp(),
+          }, { merge: true });
+          
+          // If this is a recruiter, create a recruiters/{uid} profile doc too
+          if (selectedRole === 'recruiter') {
+            try {
+              await setDoc(doc(db, 'recruiters', uid), {
+                fullName: fullName.trim(),
+                email: email.trim().toLowerCase(),
+                company: '',
+                verified: false,
+                createdAt: serverTimestamp(),
+              }, { merge: true });
+            } catch (recErr) {
+              console.error('Failed to write recruiters document after signup', recErr);
+            }
+          }
+        }
+      } catch (writeErr) {
+        console.error('Failed to write users document after signup', writeErr);
+      }
+
+      // After sign-up, the auth state listener in App.tsx will route by role.
     } catch (e) {
       console.error('SignUp error', e);
 

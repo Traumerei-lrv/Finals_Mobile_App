@@ -224,6 +224,13 @@ export async function removeAppliedJob(jobId) {
   return nextAppliedJobs;
 }
 
+export async function withdrawAppliedJob(jobId) {
+  return updateAppliedJob(jobId, {
+    status: 'WITHDRAWN',
+    withdrawnAt: new Date().toISOString(),
+  });
+}
+
 export async function clearAppliedJobs() {
   await removeStoredValue(STORAGE_KEYS.appliedJobs);
 }

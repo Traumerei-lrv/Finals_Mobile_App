@@ -20,7 +20,7 @@ import {
   saveJob,
   saveRecentSearch,
 } from '../utils/storage';
-import { SEARCH_RECOMMENDED_JOBS, searchJobs } from '../data/jobs';
+import { searchJobsFromList, subscribeToOpenJobs } from '../utils/jobsFirestore';
 import SidebarMenu from '../components/SidebarMenu';
 
 const { width } = Dimensions.get('window');
@@ -50,6 +50,7 @@ const SearchJobsScreen = ({navigation, route}) => {
   const [recentSearches, setRecentSearches] = useState(DEFAULT_RECENT_SEARCHES);
   const [savedJobs, setSavedJobs] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [jobs, setJobs] = useState([]);
 
   useEffect(() => {
     if (route?.params?.query) {
@@ -98,6 +99,15 @@ const SearchJobsScreen = ({navigation, route}) => {
     };
   }, [navigation]);
 
+  useEffect(() => {
+    const unsubscribe = subscribeToOpenJobs(
+      (nextJobs) => setJobs(nextJobs),
+      (error) => console.error('Search jobs subscription error', error),
+    );
+
+    return unsubscribe;
+  }, []);
+
   const handleSearchSubmit = async () => {
     if (!search.trim()) {
       return;
@@ -137,13 +147,14 @@ const SearchJobsScreen = ({navigation, route}) => {
   };
 
   const recommendedJobs = useMemo(() => {
+    const defaultList = jobs.slice(0, 9);
     if (!search.trim()) {
-      return SEARCH_RECOMMENDED_JOBS.slice(0, 9);
+      return defaultList;
     }
 
-    const results = searchJobs(search);
-    return results.length ? results : SEARCH_RECOMMENDED_JOBS.slice(0, 9);
-  }, [search]);
+    const results = searchJobsFromList(jobs, search);
+    return results.length ? results : defaultList;
+  }, [jobs, search]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -159,7 +170,7 @@ const SearchJobsScreen = ({navigation, route}) => {
         <TouchableOpacity onPress={handleOpenSidebar}>
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        <Text style={styles.logoText}>JobFinder</Text>
+        <Text style={styles.logoText}>Career Go</Text>
         <TouchableOpacity>
           <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
         </TouchableOpacity>
@@ -225,6 +236,12 @@ const SearchJobsScreen = ({navigation, route}) => {
         </View>
 
         <View style={styles.jobList}>
+          {!recommendedJobs.length ? (
+            <View style={styles.emptyJobsCard}>
+              <Text style={styles.emptyJobsTitle}>No jobs available yet</Text>
+              <Text style={styles.emptyJobsSubtitle}>Recruiter postings will show up here automatically.</Text>
+            </View>
+          ) : null}
           {recommendedJobs.map((job) => (
             <JobCard
               key={job.id}
@@ -477,6 +494,23 @@ const styles = StyleSheet.create({
   jobList: {
     paddingHorizontal: 20,
     gap: 16,
+  },
+  emptyJobsCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+    padding: 16,
+  },
+  emptyJobsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.primary,
+    marginBottom: 6,
+  },
+  emptyJobsSubtitle: {
+    fontSize: 13,
+    color: COLORS.secondary,
   },
   jobCard: {
     backgroundColor: COLORS.white,

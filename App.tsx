@@ -1,16 +1,24 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { auth } from './firebase';
+import { auth, db } from './firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import {
   clearStoredAuthUser,
   getStoredAuthUser,
   saveStoredAuthUser,
 } from './utils/storage';
-import LoginScreen from './screens/LoginScreen';
+import LoginScreen from './screens/job_Seeker/LoginScreen';
+import RecruiterHome from './screens/admin/RecruiterHome';
+import PostJobScreen from './screens/admin/PostJob/PostJob';
+import PostJobStep2Screen from './screens/admin/PostJob/PostJob2';
+import PostJobStep3Screen from './screens/admin/PostJob/PostJob3';
+import JobPostingSuccessScreen from './screens/admin/PostJob/PostJobSuccess';
+import ApplicantsListScreen from './screens/admin/ApplicantsList';
+import RecruiterProfileScreen from './screens/admin/RecruiterProfile';
 import HomeScreen from './screens/HomeScreen';
 import SignupScreen from './screens/SignupScreen';
 import ProfileScreen from './screens/Profile';
@@ -27,18 +35,74 @@ import PrivacySettingsScreen from './screens/PrivacySettingsScreen';
 
 const Stack = createNativeStackNavigator();
 
+const normalizeRole = (value: unknown) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const role = value.toLowerCase();
+
+  if (role === 'recruiter' || role === 'admin') {
+    return role;
+  }
+
+  if (role === 'job_seeker' || role === 'job seeker' || role === 'seeker') {
+    return 'job_seeker';
+  }
+
+  return null;
+};
+
 export default function App() {
   const [initializing, setInitializing] = useState(true);
   const [user, setUser] = useState<User | null>(null);
+  const [role, setRole] = useState<string | null>(null);
+  const [resolvingRole, setResolvingRole] = useState(false);
+  const sessionHydratedRef = useRef(false);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u: User | null) => {
+    const unsub = onAuthStateChanged(auth, async (u: User | null) => {
       setUser(u);
-      setInitializing(false);
 
       if (u) {
-        void saveStoredAuthUser(u);
+        setResolvingRole(true);
+        setRole(null);
+        sessionHydratedRef.current = false;
+        try {
+          // Read role from Firestore users/{uid}
+          const userRef = doc(db, 'users', u.uid);
+          const userSnap = await getDoc(userRef);
+          const userData = userSnap.exists() ? userSnap.data() : null;
+          const remoteRole =
+            normalizeRole(userData?.role) ??
+            normalizeRole(userData?.userRole) ??
+            normalizeRole(userData?.type);
+          const claimRole = normalizeRole((await u.getIdTokenResult()).claims?.role);
+
+          // Backward compatibility: recruiter profile may exist only in recruiters/{uid}.
+          let recruiterFallbackRole: 'recruiter' | null = null;
+          if (!remoteRole && !claimRole) {
+            const recruiterRef = doc(db, 'recruiters', u.uid);
+            const recruiterSnap = await getDoc(recruiterRef);
+            if (recruiterSnap.exists()) {
+              recruiterFallbackRole = 'recruiter';
+            }
+          }
+
+          setRole(remoteRole ?? claimRole ?? recruiterFallbackRole ?? 'job_seeker');
+          await saveStoredAuthUser(u);
+          sessionHydratedRef.current = true;
+        } catch (err) {
+          console.error('Error reading user document for role', err);
+          setRole('job_seeker');
+        } finally {
+          setResolvingRole(false);
+          setInitializing(false);
+        }
       } else {
+        setResolvingRole(false);
+        setRole(null);
+        setInitializing(false);
         void clearStoredAuthUser();
       }
     });
@@ -62,7 +126,23 @@ export default function App() {
 
       const storedUid = storedUser?.uid ?? null;
 
-      if (!storedUid || storedUid !== user.uid) {
+      // If no cached user exists yet during initial hydration, store it first.
+      if (!storedUid) {
+        if (sessionHydratedRef.current) {
+          try {
+            await signOut(auth);
+          } catch (error) {
+            console.error('Session missing in storage; sign out failed', error);
+          }
+          return;
+        }
+        await saveStoredAuthUser(user);
+        sessionHydratedRef.current = true;
+        return;
+      }
+
+      // Sign out only when we detect a true mismatch between cached and live auth users.
+      if (storedUid !== user.uid) {
         try {
           await signOut(auth);
         } catch (error) {
@@ -82,11 +162,13 @@ export default function App() {
     };
   }, [initializing, user]);
 
-  if (initializing) {
+  if (initializing || (user && resolvingRole)) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#1a365d" />
-        <Text style={styles.loadingText}>Restoring your session</Text>
+        <Text style={styles.loadingText}>
+          {initializing ? 'Restoring your session' : 'Loading your dashboard'}
+        </Text>
       </View>
     );
   }
@@ -95,8 +177,21 @@ export default function App() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {user ? (
+          // Route based on role claim: 'admin' or 'recruiter' -> recruiter/admin area; otherwise Job Seeker flows
           <>
-            <Stack.Screen name="Home" component={HomeScreen} />
+            {role === 'admin' || role === 'recruiter' ? (
+              <>
+                <Stack.Screen name="RecruiterHome" component={RecruiterHome as React.ComponentType<any>} />
+                <Stack.Screen name="PostJob" component={PostJobScreen as React.ComponentType<any>} />
+                <Stack.Screen name="PostJobStep2" component={PostJobStep2Screen as React.ComponentType<any>} />
+                <Stack.Screen name="PostJobStep3" component={PostJobStep3Screen as React.ComponentType<any>} />
+                <Stack.Screen name="PostJobSuccess" component={JobPostingSuccessScreen as React.ComponentType<any>} />
+                <Stack.Screen name="ApplicantsList" component={ApplicantsListScreen as React.ComponentType<any>} />
+                <Stack.Screen name="RecruiterProfile" component={RecruiterProfileScreen as React.ComponentType<any>} />
+              </>
+            ) : (
+              <>
+                <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="Search" component={SearchScreen} />
             <Stack.Screen name="Saved" component={SavedJobsScreen} />
             <Stack.Screen name="Application" component={ApplicationScreen} />
@@ -108,6 +203,8 @@ export default function App() {
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="ResumeSettings" component={ResumeSettingsScreen} />
             <Stack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />
+              </>
+            )}
           </>
         ) : (
           <>

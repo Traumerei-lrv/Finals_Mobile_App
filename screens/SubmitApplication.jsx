@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   StyleSheet,
   View,
   Text,
@@ -12,7 +13,10 @@ import {
   Dimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { saveAppliedJob } from '../utils/storage';
+import * as DocumentPicker from 'expo-document-picker';
+import { auth } from '../firebase';
+import { submitJobApplication } from '../utils/applicationsFirestore';
+import { uploadResumeForApplicant } from '../utils/resumeUpload';
 
 const { width } = Dimensions.get('window');
 
@@ -35,6 +39,8 @@ const COLORS = {
 
 const SubmitApplicationScreen = ({ navigation, route }) => {
   const job = route?.params?.job ?? null;
+  const [resume, setResume] = useState(null);
+  const [uploadingResume, setUploadingResume] = useState(false);
   const [formData, setFormData] = useState({
     fullName: 'Alex Morgan',
     email: 'alex.morgan@example.com',
@@ -43,13 +49,82 @@ const SubmitApplicationScreen = ({ navigation, route }) => {
     noticePeriod: '',
   });
 
+  const handlePickAndUploadResume = async () => {
+    const applicantId = auth.currentUser?.uid ?? null;
+    if (!applicantId) {
+      Alert.alert('Sign in required', 'Please sign in again before uploading your resume.');
+      return;
+    }
+
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      if (result.canceled || !result.assets?.length) {
+        return;
+      }
+
+      const pickedFile = result.assets[0];
+      setUploadingResume(true);
+      const upload = await uploadResumeForApplicant({
+        applicantId,
+        fileAsset: pickedFile,
+      });
+
+      setResume({
+        name: pickedFile.name ?? upload.resumeFileName,
+        size: pickedFile.size ?? null,
+        ...upload,
+      });
+    } catch (error) {
+      console.error('Resume upload failed', error);
+      Alert.alert('Upload failed', 'Unable to upload resume right now. Please try again.');
+    } finally {
+      setUploadingResume(false);
+    }
+  };
+
   const handleSubmitApplication = async () => {
     if (!job) {
       return;
     }
 
-    await saveAppliedJob(job);
-    navigation.navigate('ApplicationSubmitted', { job });
+    const applicant = auth.currentUser;
+
+    if (!applicant?.uid) {
+      Alert.alert('Sign in required', 'Please sign in again before applying.');
+      return;
+    }
+
+    if (!resume?.resumeUrl) {
+      Alert.alert('Resume required', 'Please upload your resume before submitting your application.');
+      return;
+    }
+
+    try {
+      await submitJobApplication({
+        job,
+        applicant,
+        formData: {
+          ...formData,
+          resumeUrl: resume.resumeUrl,
+          resumePath: resume.resumePath,
+          resumeFileName: resume.resumeFileName ?? resume.name,
+        },
+      });
+
+      navigation.navigate('ApplicationSubmitted', { job });
+    } catch (error) {
+      console.error('Application submit failed', error);
+      Alert.alert('Submission failed', 'Unable to submit your application right now. Please try again.');
+    }
   };
 
   return (
@@ -90,15 +165,19 @@ const SubmitApplicationScreen = ({ navigation, route }) => {
           <View style={styles.sectionHeader}>
              <MaterialCommunityIcons name="file-document-outline" size={20} color={COLORS.primary} />
              <Text style={styles.sectionTitle}>Upload CV</Text>
-          </View>
+          </View>   
           
-          <TouchableOpacity style={styles.uploadBox}>
+          <TouchableOpacity style={styles.uploadBox} onPress={handlePickAndUploadResume} disabled={uploadingResume}>
             <View style={styles.pdfIconContainer}>
                <MaterialCommunityIcons name="file-pdf-box" size={32} color={COLORS.primary} />
             </View>
-            <Text style={styles.uploadTitle}>Upload Resume</Text>
+            <Text style={styles.uploadTitle}>
+              {uploadingResume ? 'Uploading Resume...' : resume?.name ? 'Resume Uploaded' : 'Upload Resume'}
+            </Text>
             <Text style={styles.uploadSubtitle}>
-              Drag and drop or click to browse (PDF, max 5MB)
+              {resume?.name
+                ? `${resume.name}${resume.size ? ` • ${Math.ceil(resume.size / 1024)} KB` : ''}`
+                : 'Click to browse (PDF/DOC/DOCX, max 5MB)'}
             </Text>
           </TouchableOpacity>
 

@@ -19,10 +19,9 @@ import {
 } from '../utils/storage';
 import SidebarMenu from '../components/SidebarMenu';
 import {
-  FEATURED_HOME_JOB,
-  HOME_NEARBY_JOBS,
-  searchJobs,
-} from '../data/jobs';
+  searchJobsFromList,
+  subscribeToOpenJobs,
+} from '../utils/jobsFirestore';
 
 const { width } = Dimensions.get('window');
 
@@ -46,6 +45,7 @@ const JobSeekerHome = ({ navigation }) => {
   const [search, setSearch] = useState('');
   const [savedJobs, setSavedJobs] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [jobs, setJobs] = useState([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -65,18 +65,27 @@ const JobSeekerHome = ({ navigation }) => {
     };
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = subscribeToOpenJobs(
+      (nextJobs) => setJobs(nextJobs),
+      (error) => console.error('Home jobs subscription error', error),
+    );
+
+    return unsubscribe;
+  }, []);
+
   const savedJobIds = useMemo(() => new Set(savedJobs.map((job) => job.id)), [savedJobs]);
-  const featuredJob = FEATURED_HOME_JOB ?? JOB_DATA[0];
+  const featuredJob = jobs[0] ?? null;
   const displayedJobs = useMemo(() => {
-    const fallbackJobs = HOME_NEARBY_JOBS.length ? HOME_NEARBY_JOBS : JOB_DATA;
+    const fallbackJobs = jobs.slice(1, 7).length ? jobs.slice(1, 7) : jobs;
     const normalizedQuery = search.trim();
     if (!normalizedQuery) {
       return fallbackJobs;
     }
 
-    const matches = searchJobs(normalizedQuery);
+    const matches = searchJobsFromList(jobs, normalizedQuery);
     return matches.length ? matches.slice(0, 6) : fallbackJobs;
-  }, [search]);
+  }, [jobs, search]);
 
   const getJobId = (job) => job.id ?? [job.role, job.company, job.location].join('|').toLowerCase();
 
@@ -117,9 +126,9 @@ const JobSeekerHome = ({ navigation }) => {
         <TouchableOpacity onPress={handleOpenSidebar}>
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        <Text style={styles.logoText}>JobFinder</Text>
+          <Text style={styles.logoText}>Career Go</Text>
         <TouchableOpacity>
-          <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
+          <MaterialCommunityIcons name="notifications-outline" size={4} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
 
@@ -161,13 +170,13 @@ const JobSeekerHome = ({ navigation }) => {
           <View style={styles.featuredCard}>
             <View style={styles.featuredHeader}>
               <View style={styles.companyLogoPlaceholder}>
-                <MaterialCommunityIcons name="google" size={24} color={COLORS.white} />
+                <MaterialCommunityIcons name={featuredJob?.icon ?? 'office-building'} size={24} color={COLORS.white} />
               </View>
               <View>
                 <Text style={styles.featuredRole}>{featuredJob?.role ?? 'Senior Product Designer'}</Text>
-                <Text style={styles.featuredCompany}>
-                  {featuredJob?.company ?? 'Google'} • {featuredJob?.location ?? 'Mountain View, CA'}
-                </Text>
+              <Text style={styles.featuredCompany}>
+                  {featuredJob?.company ?? 'No company yet'} • {featuredJob?.location ?? 'No location yet'}
+              </Text>
               </View>
             </View>
             <View style={styles.tagRow}>
@@ -176,10 +185,10 @@ const JobSeekerHome = ({ navigation }) => {
               ))}
             </View>
             <View style={styles.featuredFooter}>
-              <Text style={styles.salaryText}>{featuredJob?.salary ?? '$180k - $240k'}</Text>
+              <Text style={styles.salaryText}>{featuredJob?.salary ?? 'No salary yet'}</Text>
               <TouchableOpacity
                 style={styles.applyButton}
-                onPress={() => navigation.navigate('JobDetails', { job: featuredJob })}
+                onPress={() => featuredJob && navigation.navigate('JobDetails', { job: featuredJob })}
               >
                 <Text style={styles.applyButtonText}>Apply Now</Text>
               </TouchableOpacity>
@@ -200,6 +209,12 @@ const JobSeekerHome = ({ navigation }) => {
         </View>
 
         <View style={styles.jobList}>
+          {!displayedJobs.length ? (
+            <View style={styles.emptyJobsCard}>
+              <Text style={styles.emptyJobsTitle}>No jobs posted yet</Text>
+              <Text style={styles.emptyJobsSubtitle}>Recruiter job postings will appear here in real time.</Text>
+            </View>
+          ) : null}
           {displayedJobs.map((job) => (
             <TouchableOpacity
               key={job.id}
@@ -280,12 +295,6 @@ const JobSeekerHome = ({ navigation }) => {
     </SafeAreaView>
   );
 };
-
-const JOB_DATA = [
-  { id: '1', role: 'UX Researcher', company: 'Airbnb', location: 'San Francisco, CA', salary: '$130k - $160k', type: 'Full-time', posted: 'Posted 2 days ago', icon: 'home-variant', color: '#FF5A5F' },
-  { id: '2', role: 'Senior Data Analyst', company: 'Microsoft', location: 'Redmond, WA', salary: '$145k - $190k', type: 'On-site', posted: 'Posted 4 hours ago', icon: 'microsoft', color: '#00A4EF' },
-  { id: '3', role: 'Customer Success Lead', company: 'Slack', location: 'Remote, USA', salary: '$110k - $140k', type: 'Remote', posted: 'Posted Yesterday', icon: 'slack', color: '#4A154B' },
-];
 
 const styles = StyleSheet.create({
   container: {
@@ -521,6 +530,24 @@ const styles = StyleSheet.create({
   jobList: {
     paddingHorizontal: 20,
     gap: 16,
+  },
+  emptyJobsCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+    padding: 16,
+    marginBottom: 4,
+  },
+  emptyJobsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.primary,
+    marginBottom: 6,
+  },
+  emptyJobsSubtitle: {
+    fontSize: 13,
+    color: COLORS.secondary,
   },
   jobCard: {
     backgroundColor: COLORS.white,

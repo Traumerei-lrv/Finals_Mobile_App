@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import RecruiterBottomNav from '../../../components/RecruiterBottomNav';
 
 const { width } = Dimensions.get('window');
 
@@ -29,43 +30,52 @@ const COLORS = {
   secondaryContainer: '#e2e7f9',
 };
 
-const SuccessScreen = () => {
+const JobPostingSuccessScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       {/* Top App Bar */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerLogo}>JobFinder</Text>
-        <TouchableOpacity style={styles.headerButton}>
-          <MaterialCommunityIcons name="more-vertical" size={24} color={COLORS.primary} />
-        </TouchableOpacity>
+        <View style={styles.headerLeft}>
+          <MaterialCommunityIcons name="briefcase-outline" size={24} color={COLORS.primary} />
+          <Text style={styles.headerLogo}>JobFinder</Text>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.iconButton}>
+            <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
+          </TouchableOpacity>
+          <View style={styles.profileAvatarPlaceholder}>
+             <MaterialCommunityIcons name="account" size={24} color={COLORS.primary} />
+          </View>
+        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Success Icon */}
         <View style={styles.successIconSection}>
           <View style={styles.successIconContainer}>
-            <MaterialCommunityIcons name="check-bold" size={48} color={COLORS.white} />
+            <MaterialCommunityIcons name="rocket-launch" size={48} color={COLORS.white} />
           </View>
         </View>
 
         {/* Headline */}
         <View style={styles.headlineSection}>
-          <Text style={styles.title}>Application Submitted!</Text>
+          <Text style={styles.title}>Job Successfully Posted!</Text>
           <Text style={styles.subtitle}>
-            Your application for <Text style={styles.boldText}>Senior Product Designer</Text> at <Text style={styles.boldText}>Google</Text> has been successfully delivered.
+            Your search for the perfect Senior Product Designer starts now.
           </Text>
         </View>
 
-        {/* Feature Image */}
-        <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?q=80&w=2071&auto=format&fit=crop' }}
-            style={styles.featureImage}
-            resizeMode="cover"
-          />
+        {/* Job Summary Card */}
+        <View style={styles.jobCard}>
+          <View style={styles.cardHeader}>
+             <View style={styles.tagRow}>
+                <View style={styles.typeTag}><Text style={styles.typeTagText}>FULL-TIME</Text></View>
+                <Text style={styles.postedDate}>Posted Today</Text>
+             </View>
+             <Text style={styles.salaryText}>$140k - $185k</Text>
+          </View>
+          <Text style={styles.jobTitle}>Senior Product Designer</Text>
+          <Text style={styles.jobLocation}>Design Operations • San Francisco, CA (Hybrid)</Text>
         </View>
 
         {/* What Happens Next Card */}
@@ -73,67 +83,46 @@ const SuccessScreen = () => {
           <Text style={styles.cardTitle}>What happens next?</Text>
           
           <NextStepItem 
-            number="1"
-            title="Recruiter reviews profile"
-            description="The hiring team at Google will evaluate your portfolio and experience against the requirements."
+            icon="earth"
+            title="Your post is live on our 2M+ network"
+            description="The listing is being distributed across our global network of high-intent job seekers."
           />
           
           <NextStepItem 
-            number="2"
-            title="Update via email in 3-5 days"
-            description="You will receive an automated notification regarding the initial screening outcome."
+            icon="email-outline"
+            title="You'll receive notifications for new applicants"
+            description="Stay updated with real-time alerts whenever a qualified candidate submits an application."
           />
           
           <NextStepItem 
-            number="3"
-            title="Track status in 'Applied' tab"
-            description="View real-time progress of this and other applications in your personal dashboard."
+            icon="chart-timeline-variant"
+            title="Track progress in your dashboard"
+            description="Manage applicants, schedule interviews, and move candidates through your pipeline."
           />
         </View>
 
         {/* Action Buttons */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Track Application</Text>
-            <MaterialCommunityIcons name="chart-box-outline" size={20} color={COLORS.white} />
+            <MaterialCommunityIcons name="pencil-outline" size={20} color={COLORS.white} />
+            <Text style={styles.primaryButtonText}>Manage This Job</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Return to Search</Text>
-            <MaterialCommunityIcons name="magnify" size={20} color={COLORS.primary} />
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('RecruiterHome')}>
+            <Text style={styles.secondaryButtonText}>Return to Dashboard</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
 
-      {/* Bottom Nav Bar */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
-          <MaterialCommunityIcons name="magnify" size={24} color={COLORS.secondary} />
-          <Text style={styles.navLabel}>Search</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItemActive}>
-          <View style={styles.activeNavIndicator}>
-            <MaterialCommunityIcons name="file-document" size={24} color={COLORS.primary} />
-            <Text style={styles.navLabelActive}>Applied</Text>
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <MaterialCommunityIcons name="bookmark-outline" size={24} color={COLORS.secondary} />
-          <Text style={styles.navLabel}>Saved</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <MaterialCommunityIcons name="account-outline" size={24} color={COLORS.secondary} />
-          <Text style={styles.navLabel}>Profile</Text>
-        </TouchableOpacity>
-      </View>
+      <RecruiterBottomNav navigation={navigation} activeTab="post_job" showFab />
     </SafeAreaView>
   );
 };
 
-const NextStepItem = ({ number, title, description }) => (
+const NextStepItem = ({ icon, title, description }) => (
   <View style={styles.stepItem}>
-    <View style={styles.stepNumberContainer}>
-      <Text style={styles.stepNumber}>{number}</Text>
+    <View style={styles.stepIconContainer}>
+      <MaterialCommunityIcons name={icon} size={22} color={COLORS.primary} />
     </View>
     <View style={styles.stepTextContent}>
       <Text style={styles.stepTitle}>{title}</Text>
@@ -157,8 +146,10 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.outline,
     backgroundColor: COLORS.white,
   },
-  headerButton: {
-    padding: 4,
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   headerLogo: {
     fontSize: 22,
@@ -166,8 +157,26 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontFamily: Platform.OS === 'ios' ? 'Hanken Grotesk' : 'sans-serif',
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconButton: {
+    padding: 4,
+  },
+  profileAvatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.surfaceContainerLow,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+  },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   successIconSection: {
     alignItems: 'center',
@@ -178,14 +187,14 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 20,
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#8AB4F8', // Lighter blue for the rocket icon background
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 12,
-    elevation: 8,
+    elevation: 6,
   },
   headlineSection: {
     alignItems: 'center',
@@ -204,28 +213,64 @@ const styles = StyleSheet.create({
     color: COLORS.onSurfaceVariant,
     textAlign: 'center',
     lineHeight: 24,
+    paddingHorizontal: 10,
   },
-  boldText: {
-    fontWeight: '800',
-    color: COLORS.primary,
-  },
-  imageContainer: {
-    paddingHorizontal: 20,
+  jobCard: {
+    backgroundColor: COLORS.white,
+    marginHorizontal: 20,
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
     marginBottom: 32,
   },
-  featureImage: {
-    width: '100%',
-    height: 180,
-    borderRadius: 16,
-    backgroundColor: COLORS.surfaceContainer,
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  tagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  typeTag: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  typeTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.white,
+  },
+  postedDate: {
+    fontSize: 12,
+    color: COLORS.onSurfaceVariant,
+    fontWeight: '500',
+  },
+  salaryText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  jobTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.primary,
+    marginBottom: 4,
+  },
+  jobLocation: {
+    fontSize: 14,
+    color: COLORS.onSurfaceVariant,
   },
   nextStepsCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: '#F0F3FF', // Matching the light container from screenshot
     marginHorizontal: 20,
     padding: 24,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.outline,
     marginBottom: 32,
   },
   cardTitle: {
@@ -239,25 +284,20 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     gap: 16,
   },
-  stepNumberContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: COLORS.surfaceContainer,
+  stepIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E2E7F9',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 2,
-  },
-  stepNumber: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: COLORS.primary,
   },
   stepTextContent: {
     flex: 1,
   },
   stepTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: COLORS.primary,
     marginBottom: 4,
@@ -273,7 +313,7 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   primaryButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#001a33', // Deep navy
     height: 56,
     borderRadius: 12,
     flexDirection: 'row',
@@ -296,11 +336,9 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.primary,
-    flexDirection: 'row',
+    borderColor: COLORS.outline,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
   },
   secondaryButtonText: {
     color: COLORS.primary,
@@ -347,4 +385,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SuccessScreen;
+export default JobPostingSuccessScreen;
