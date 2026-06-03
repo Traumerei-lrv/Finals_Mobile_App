@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -8,56 +8,94 @@ import {
   SafeAreaView,
   ScrollView,
   Platform,
-  Dimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import RecruiterBottomNav from '../../../components/RecruiterBottomNav';
 
-const { width } = Dimensions.get('window');
-
-// Design Tokens (Professional Velocity - matching DS_2)
 const COLORS = {
   primary: '#1a365d',
   secondary: '#5d7291',
   surface: '#f9f9ff',
   surfaceContainer: '#e2e7f9',
   surfaceContainerLow: '#f0f3ff',
-  surfaceContainerHigh: '#d4dbf4',
-  onSurface: '#1a365d',
-  onSurfaceVariant: '#5d7291',
   outline: '#cfdaf1',
   white: '#ffffff',
-  accentBlue: '#00a8e1',
-  accentYellow: '#f9b208',
-  secondaryContainer: '#e2e7f9',
-  onSecondaryContainer: '#1a365d',
 };
 
+const DEFAULT_SKILLS = ['UI/UX Design', 'Lead Design', 'Prototyping'];
+const DEFAULT_QUALIFICATIONS = [
+  'Must be able to work in US Timezones',
+  'Must have a public portfolio',
+];
+
 const PostJobStep2Screen = ({ navigation, route }) => {
-  const draft = route?.params?.draft ?? null;
-  const [qualifications, setQualifications] = useState([
-    { id: 1, text: 'Must be able to work in US Timezones', sub: 'Standard EST/PST overlap of at least 4 hours.', checked: true },
-    { id: 2, text: 'Must have a public portfolio', sub: 'Behance, Dribbble, or personal site required.', checked: true },
-  ]);
+  const draft = route?.params?.draft ?? {};
 
-  const [skills, setSkills] = useState(['UI/UX Design', 'Lead Design', 'Prototyping']);
-  const [minExperience, setMinExperience] = useState('5-8 years');
-  const [education, setEducation] = useState("Bachelor's Degree");
-  const [languages, setLanguages] = useState(['English (Native/Fluent)', 'Spanish (Professional)']);
+  const [skillInput, setSkillInput] = useState('');
+  const [skills, setSkills] = useState(
+    Array.isArray(draft?.skills) && draft.skills.length ? draft.skills : DEFAULT_SKILLS,
+  );
 
-  const toggleQualification = (id) => {
-    setQualifications(qualifications.map(q => q.id === id ? { ...q, checked: !q.checked } : q));
+  const [qualificationInput, setQualificationInput] = useState('');
+  const [qualifications, setQualifications] = useState(
+    Array.isArray(draft?.qualifications) && draft.qualifications.length
+      ? draft.qualifications
+      : DEFAULT_QUALIFICATIONS,
+  );
+
+  const [minExperience, setMinExperience] = useState(draft?.minExperience ?? '');
+  const [education, setEducation] = useState(draft?.education ?? '');
+  const [languagesInput, setLanguagesInput] = useState('');
+  const [languages, setLanguages] = useState(
+    Array.isArray(draft?.languages) && draft.languages.length ? draft.languages : [],
+  );
+
+  const recommendedSkills = useMemo(
+    () => ['User Research', 'Design Systems', 'Figma'].filter((item) => !skills.includes(item)),
+    [skills],
+  );
+
+  const addSkill = (value) => {
+    const next = String(value ?? '').trim();
+    if (!next) return;
+    if (skills.some((skill) => skill.toLowerCase() === next.toLowerCase())) return;
+    setSkills((prev) => [...prev, next]);
+    setSkillInput('');
+  };
+
+  const addQualification = (value) => {
+    const next = String(value ?? '').trim();
+    if (!next) return;
+    if (qualifications.some((item) => item.toLowerCase() === next.toLowerCase())) return;
+    setQualifications((prev) => [...prev, next]);
+    setQualificationInput('');
+  };
+
+  const addLanguage = (value) => {
+    const next = String(value ?? '').trim();
+    if (!next) return;
+    if (languages.some((item) => item.toLowerCase() === next.toLowerCase())) return;
+    setLanguages((prev) => [...prev, next]);
+    setLanguagesInput('');
+  };
+
+  const nextDraft = {
+    ...draft,
+    skills,
+    qualifications,
+    minExperience,
+    education,
+    languages,
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Top App Bar */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.profileAvatarPlaceholder}>
-             <MaterialCommunityIcons name="account" size={24} color={COLORS.primary} />
+            <MaterialCommunityIcons name="account" size={24} color={COLORS.primary} />
           </View>
-          <Text style={styles.headerLogo}>Recruiter Hub</Text>
+          <Text style={styles.headerLogo}>Career Go</Text>
         </View>
         <TouchableOpacity>
           <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
@@ -65,7 +103,6 @@ const PostJobStep2Screen = ({ navigation, route }) => {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Progress Header */}
         <View style={styles.progressHeader}>
           <View style={styles.titleRow}>
             <Text style={styles.stepIndicator}>STEP 2 OF 3</Text>
@@ -77,28 +114,34 @@ const PostJobStep2Screen = ({ navigation, route }) => {
           </View>
         </View>
 
-        {/* Skills & Expertise Section */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-             <MaterialCommunityIcons name="bullseye-arrow" size={20} color={COLORS.primary} />
-             <Text style={styles.cardTitle}>SKILLS & EXPERTISE</Text>
+            <MaterialCommunityIcons name="bullseye-arrow" size={20} color={COLORS.primary} />
+            <Text style={styles.cardTitle}>SKILLS & EXPERTISE</Text>
           </View>
-          
-          <View style={styles.searchContainer}>
-            <MaterialCommunityIcons name="magnify" size={20} color={COLORS.secondary} />
-            <TextInput 
-              style={styles.searchInput}
-              placeholder="Add skills (e.g., Figma, React Native)"
+
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.input}
+              placeholder="Add skill (e.g., React Native)"
               placeholderTextColor={COLORS.secondary}
+              value={skillInput}
+              onChangeText={setSkillInput}
+              onSubmitEditing={() => addSkill(skillInput)}
             />
+            <TouchableOpacity style={styles.smallAction} onPress={() => addSkill(skillInput)}>
+              <MaterialCommunityIcons name="plus" size={18} color={COLORS.white} />
+            </TouchableOpacity>
           </View>
 
           <Text style={styles.inputLabel}>Added Skills</Text>
           <View style={styles.chipRow}>
-            {skills.map((skill, index) => (
-              <View key={index} style={styles.activeChip}>
+            {skills.map((skill) => (
+              <View key={skill} style={styles.activeChip}>
                 <Text style={styles.activeChipText}>{skill}</Text>
-                <MaterialCommunityIcons name="close" size={16} color={COLORS.white} />
+                <TouchableOpacity onPress={() => setSkills((prev) => prev.filter((item) => item !== skill))}>
+                  <MaterialCommunityIcons name="close" size={16} color={COLORS.white} />
+                </TouchableOpacity>
               </View>
             ))}
           </View>
@@ -107,8 +150,8 @@ const PostJobStep2Screen = ({ navigation, route }) => {
 
           <Text style={styles.inputLabel}>Recommended for this role</Text>
           <View style={styles.chipRow}>
-            {['User Research', 'Design Systems', 'Figma'].map((rec, index) => (
-              <TouchableOpacity key={index} style={styles.recChip}>
+            {recommendedSkills.map((rec) => (
+              <TouchableOpacity key={rec} style={styles.recChip} onPress={() => addSkill(rec)}>
                 <MaterialCommunityIcons name="plus" size={16} color={COLORS.primary} />
                 <Text style={styles.recChipText}>{rec}</Text>
               </TouchableOpacity>
@@ -116,102 +159,97 @@ const PostJobStep2Screen = ({ navigation, route }) => {
           </View>
         </View>
 
-        {/* Qualifications Checklist */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-             <MaterialCommunityIcons name="checkbox-marked-circle-outline" size={20} color={COLORS.primary} />
-             <Text style={styles.cardTitle}>QUALIFICATIONS CHECKLIST</Text>
+            <MaterialCommunityIcons name="checkbox-marked-circle-outline" size={20} color={COLORS.primary} />
+            <Text style={styles.cardTitle}>QUALIFICATIONS</Text>
           </View>
-          <Text style={styles.cardSubtitle}>
-            Define the non-negotiable "must-have" items for this position.
-          </Text>
+          <Text style={styles.cardSubtitle}>Add clear must-have qualifications for this role.</Text>
 
-          {qualifications.map((q) => (
-            <View key={q.id} style={styles.qualItem}>
-              <TouchableOpacity onPress={() => toggleQualification(q.id)} style={[styles.checkbox, q.checked && styles.checkboxChecked]}>
-                {q.checked && <MaterialCommunityIcons name="check" size={16} color={COLORS.white} />}
-              </TouchableOpacity>
-              <View style={styles.qualContent}>
-                <Text style={styles.qualText}>{q.text}</Text>
-                <Text style={styles.qualSubText}>{q.sub}</Text>
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.input}
+              placeholder="Add qualification"
+              placeholderTextColor={COLORS.secondary}
+              value={qualificationInput}
+              onChangeText={setQualificationInput}
+              onSubmitEditing={() => addQualification(qualificationInput)}
+            />
+            <TouchableOpacity style={styles.smallAction} onPress={() => addQualification(qualificationInput)}>
+              <MaterialCommunityIcons name="plus" size={18} color={COLORS.white} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.listStack}>
+            {qualifications.map((item) => (
+              <View key={item} style={styles.listItem}>
+                <Text style={styles.listText}>{item}</Text>
+                <TouchableOpacity onPress={() => setQualifications((prev) => prev.filter((q) => q !== item))}>
+                  <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.secondary} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity>
-                <MaterialCommunityIcons name="delete-outline" size={22} color={COLORS.secondary} />
-              </TouchableOpacity>
-            </View>
-          ))}
-
-          <TouchableOpacity style={styles.addQualButton}>
-             <MaterialCommunityIcons name="plus-circle-outline" size={20} color={COLORS.primary} />
-             <Text style={styles.addQualText}>Add new qualification</Text>
-          </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
-        {/* Experience & Education */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-             <MaterialCommunityIcons name="school-outline" size={20} color={COLORS.primary} />
-             <Text style={styles.cardTitle}>EXPERIENCE & EDUCATION</Text>
+            <MaterialCommunityIcons name="school-outline" size={20} color={COLORS.primary} />
+            <Text style={styles.cardTitle}>EXPERIENCE & EDUCATION</Text>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Minimum Experience</Text>
-            <TouchableOpacity style={styles.selectInput}>
-              <Text style={styles.selectText}>{minExperience}</Text>
-              <MaterialCommunityIcons name="chevron-down" size={20} color={COLORS.secondary} />
+          <Text style={styles.label}>Minimum Experience</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. 3+ years"
+            placeholderTextColor={COLORS.secondary}
+            value={minExperience}
+            onChangeText={setMinExperience}
+          />
+
+          <Text style={styles.label}>Education</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. Bachelor's Degree"
+            placeholderTextColor={COLORS.secondary}
+            value={education}
+            onChangeText={setEducation}
+          />
+
+          <Text style={styles.label}>Languages</Text>
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.input}
+              placeholder="Add language"
+              placeholderTextColor={COLORS.secondary}
+              value={languagesInput}
+              onChangeText={setLanguagesInput}
+              onSubmitEditing={() => addLanguage(languagesInput)}
+            />
+            <TouchableOpacity style={styles.smallAction} onPress={() => addLanguage(languagesInput)}>
+              <MaterialCommunityIcons name="plus" size={18} color={COLORS.white} />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Education Level</Text>
-            <TouchableOpacity style={styles.selectInput}>
-              <Text style={styles.selectText}>{education}</Text>
-              <MaterialCommunityIcons name="chevron-down" size={20} color={COLORS.secondary} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.label}>Languages</Text>
-            <TouchableOpacity><Text style={styles.addLangText}>+ Add Language</Text></TouchableOpacity>
-          </View>
-
-          <View style={styles.langList}>
-             {languages.map((lang, index) => (
-               <View key={index} style={styles.langItem}>
-                 <Text style={styles.langText}>{lang}</Text>
-                 <TouchableOpacity>
-                   <MaterialCommunityIcons name="close" size={18} color={COLORS.secondary} />
-                 </TouchableOpacity>
-               </View>
-             ))}
+          <View style={styles.chipRow}>
+            {languages.map((lang) => (
+              <View key={lang} style={styles.recChip}>
+                <Text style={styles.recChipText}>{lang}</Text>
+                <TouchableOpacity onPress={() => setLanguages((prev) => prev.filter((item) => item !== lang))}>
+                  <MaterialCommunityIcons name="close" size={16} color={COLORS.primary} />
+                </TouchableOpacity>
+              </View>
+            ))}
           </View>
 
           <TouchableOpacity
             style={styles.continueButton}
-            onPress={() => navigation.navigate('PostJobStep3', { draft })}
+            onPress={() => navigation.navigate('PostJobStep3', { draft: nextDraft })}
           >
             <Text style={styles.continueButtonText}>Continue to Step 3</Text>
             <MaterialCommunityIcons name="arrow-right" size={20} color={COLORS.white} />
           </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.saveExitButton}>
-            <Text style={styles.saveExitText}>Save and exit later</Text>
-          </TouchableOpacity>
         </View>
-
-        {/* Pro Tip Banner */}
-        <View style={styles.proTipBanner}>
-           <View style={styles.proTipHeader}>
-              <MaterialCommunityIcons name="information-outline" size={18} color={COLORS.white} />
-              <Text style={styles.proTipTitle}>PRO TIP</Text>
-           </View>
-           <Text style={styles.proTipDescription}>
-             Roles with clear, specific skill requirements receive 40% more qualified applications within the first 48 hours.
-           </Text>
-        </View>
-
       </ScrollView>
 
       <RecruiterBottomNav navigation={navigation} activeTab="post_job" showFab />
@@ -220,364 +258,54 @@ const PostJobStep2Screen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.surface,
-  },
+  container: { flex: 1, backgroundColor: COLORS.surface },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outline,
-    backgroundColor: COLORS.white,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.outline, backgroundColor: COLORS.white,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   profileAvatarPlaceholder: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: COLORS.surfaceContainerLow,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.outline,
+    width: 36, height: 36, borderRadius: 8, backgroundColor: COLORS.surfaceContainerLow,
+    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.outline,
   },
-  headerLogo: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: COLORS.primary,
-    fontFamily: Platform.OS === 'ios' ? 'Hanken Grotesk' : 'sans-serif',
+  headerLogo: { fontSize: 20, fontWeight: '800', color: COLORS.primary, fontFamily: Platform.OS === 'ios' ? 'Hanken Grotesk' : 'sans-serif' },
+  scrollContent: { paddingBottom: 120 },
+  progressHeader: { padding: 20, backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: COLORS.outline },
+  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  stepIndicator: { fontSize: 12, fontWeight: '800', color: COLORS.primary },
+  percentText: { fontSize: 12, fontWeight: '600', color: COLORS.secondary },
+  screenTitle: { fontSize: 28, fontWeight: '800', color: COLORS.primary, marginBottom: 16 },
+  progressBarBg: { height: 4, backgroundColor: COLORS.surfaceContainer, borderRadius: 2, overflow: 'hidden' },
+  progressBarFill: { height: '100%', backgroundColor: COLORS.primary },
+  card: { backgroundColor: COLORS.white, marginHorizontal: 16, marginTop: 16, padding: 20, borderRadius: 12, borderWidth: 1, borderColor: COLORS.outline },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  cardTitle: { fontSize: 14, fontWeight: '800', color: COLORS.primary, letterSpacing: 0.5 },
+  cardSubtitle: { fontSize: 13, color: COLORS.secondary, marginBottom: 12 },
+  inputLabel: { fontSize: 12, fontWeight: '700', color: COLORS.secondary, marginBottom: 10 },
+  inputRow: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 14 },
+  input: {
+    flex: 1, borderWidth: 1, borderColor: COLORS.outline, borderRadius: 8,
+    paddingHorizontal: 12, height: 46, color: COLORS.primary, backgroundColor: COLORS.white,
   },
-  scrollContent: {
-    paddingBottom: 120,
+  smallAction: { width: 42, height: 42, borderRadius: 8, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
+  activeChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, gap: 6 },
+  activeChipText: { fontSize: 13, fontWeight: '600', color: COLORS.white },
+  recChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EBF1FF', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, gap: 6 },
+  recChipText: { fontSize: 13, fontWeight: '600', color: COLORS.primary },
+  divider: { height: 1, backgroundColor: COLORS.outline, marginVertical: 16 },
+  listStack: { gap: 10 },
+  listItem: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    borderWidth: 1, borderColor: COLORS.outline, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10,
   },
-  progressHeader: {
-    padding: 20,
-    backgroundColor: COLORS.white,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outline,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  stepIndicator: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: COLORS.primary,
-  },
-  percentText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.secondary,
-  },
-  screenTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: COLORS.primary,
-    marginBottom: 16,
-  },
-  progressBarBg: {
-    height: 4,
-    backgroundColor: COLORS.surfaceContainer,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: COLORS.primary,
-  },
-  card: {
-    backgroundColor: COLORS.white,
-    marginHorizontal: 16,
-    marginTop: 16,
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.outline,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-  },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: COLORS.primary,
-    letterSpacing: 0.5,
-  },
-  cardSubtitle: {
-    fontSize: 13,
-    color: COLORS.secondary,
-    lineHeight: 18,
-    marginBottom: 20,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.outline,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    height: 48,
-    marginBottom: 20,
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 14,
-    color: COLORS.onSurface,
-  },
-  inputLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.secondary,
-    marginBottom: 12,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
-  },
-  activeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 6,
-  },
-  activeChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  recChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EBF1FF',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 6,
-  },
-  recChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.primary,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.outline,
-    marginVertical: 20,
-  },
-  qualItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-    gap: 12,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: COLORS.outline,
-    backgroundColor: COLORS.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  checkboxChecked: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  qualContent: {
-    flex: 1,
-  },
-  qualText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.primary,
-    marginBottom: 4,
-  },
-  qualSubText: {
-    fontSize: 12,
-    color: COLORS.secondary,
-    lineHeight: 16,
-  },
-  addQualButton: {
-    height: 56,
-    borderWidth: 1,
-    borderColor: COLORS.outline,
-    borderStyle: 'dashed',
-    borderRadius: 8,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 12,
-  },
-  addQualText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.primary,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.primary,
-    marginBottom: 8,
-  },
-  selectInput: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.outline,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    height: 48,
-  },
-  selectText: {
-    fontSize: 14,
-    color: COLORS.onSurface,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  addLangText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  langList: {
-    gap: 8,
-    marginBottom: 24,
-  },
-  langItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#F0F3FF',
-    paddingHorizontal: 16,
-    height: 48,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.outline,
-  },
-  langText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.primary,
-  },
+  listText: { flex: 1, fontSize: 13, color: COLORS.primary, fontWeight: '600', marginRight: 10 },
+  label: { fontSize: 14, fontWeight: '700', color: COLORS.primary, marginBottom: 6, marginTop: 8 },
   continueButton: {
-    backgroundColor: '#001a33', // Deep navy
-    height: 56,
-    borderRadius: 8,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 12,
+    backgroundColor: '#001a33', height: 56, borderRadius: 8, flexDirection: 'row',
+    justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 20,
   },
-  continueButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  saveExitButton: {
-    alignSelf: 'center',
-    marginTop: 16,
-  },
-  saveExitText: {
-    fontSize: 13,
-    color: COLORS.secondary,
-    fontWeight: '600',
-  },
-  proTipBanner: {
-    margin: 16,
-    backgroundColor: '#1a365d',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 40,
-  },
-  proTipHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  proTipTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: COLORS.white,
-    letterSpacing: 0.5,
-  },
-  proTipDescription: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.8)',
-    lineHeight: 18,
-  },
-  bottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    width: '100%',
-    flexDirection: 'row',
-    backgroundColor: COLORS.white,
-    paddingTop: 10,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.outline,
-  },
-  navItem: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-  },
-  navItemActive: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  activeNavIndicator: {
-    backgroundColor: '#8AB4F8',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navLabel: {
-    fontSize: 11,
-    color: COLORS.secondary,
-    fontWeight: '600',
-  },
-  navLabelActive: {
-    fontSize: 11,
-    color: COLORS.primary,
-    fontWeight: '800',
-  },
+  continueButtonText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
 });
 
 export default PostJobStep2Screen;

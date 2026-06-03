@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   StyleSheet,
   View,
   Text,
@@ -13,6 +14,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { auth } from '../firebase';
 import {
+  archiveApplicationForApplicant,
   mapApplicationToJobSeekerCard,
   subscribeToApplicantApplications,
 } from '../utils/applicationsFirestore';
@@ -48,7 +50,7 @@ const MyApplicationsScreen = ({ navigation, route }) => {
   const [activeTab, setActiveTab] = useState('All');
   const [selectedJob, setSelectedJob] = useState(null);
   const [submittedApplications, setSubmittedApplications] = useState([]);
-  const [dismissedArchiveIds, setDismissedArchiveIds] = useState([]);
+  const [pendingArchiveIds, setPendingArchiveIds] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const tabs = ['All', 'Active', 'Interviews', 'Archive'];
@@ -73,9 +75,10 @@ const MyApplicationsScreen = ({ navigation, route }) => {
     }
   }, [navigation, route?.params?.initialTab]);
 
-  const allApplications = useMemo(() => {
-    return submittedApplications.filter((app) => !dismissedArchiveIds.includes(app.id));
-  }, [dismissedArchiveIds, submittedApplications]);
+  const allApplications = useMemo(
+    () => submittedApplications.filter((application) => !pendingArchiveIds.includes(application.id)),
+    [pendingArchiveIds, submittedApplications],
+  );
   const handleOpenSidebar = () => setSidebarOpen(true);
   const handleCloseSidebar = () => setSidebarOpen(false);
   const navigateFromSidebar = (routeName) => {
@@ -85,14 +88,21 @@ const MyApplicationsScreen = ({ navigation, route }) => {
 
   const filteredApps = allApplications.filter((app) => {
     if (activeTab === 'All') return true;
-    if (activeTab === 'Active') return app.statusType === 'review';
+    if (activeTab === 'Active') return ['applied', 'review', 'offer'].includes(app.statusType);
     if (activeTab === 'Interviews') return app.statusType === 'interview';
     if (activeTab === 'Archive') return app.statusType === 'declined' || app.statusType === 'withdrawn';
     return true;
   });
 
   const handleDeleteArchivedApp = async (app) => {
-    setDismissedArchiveIds((prev) => [...prev, app.id]);
+    setPendingArchiveIds((prev) => (prev.includes(app.id) ? prev : [...prev, app.id]));
+    try {
+      await archiveApplicationForApplicant({ applicationId: app.id });
+    } catch (error) {
+      console.error('Archive applicant application failed', error);
+      setPendingArchiveIds((prev) => prev.filter((id) => id !== app.id));
+      Alert.alert('Delete failed', 'Unable to delete this application right now. Please try again.');
+    }
   };
 
   if (selectedJob) {
@@ -243,7 +253,13 @@ const ApplicationCard = ({
       {/* Tap hint */}
       <View style={styles.viewDetailRow}>
         {typeof onDelete === 'function' && (
-          <TouchableOpacity style={styles.deleteButton} onPress={onDelete}>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={(event) => {
+              event?.stopPropagation?.();
+              onDelete?.();
+            }}
+          >
             <MaterialCommunityIcons name="delete-outline" size={16} color={COLORS.error} />
             <Text style={styles.deleteButtonText}>Delete</Text>
           </TouchableOpacity>
@@ -272,6 +288,24 @@ const JobDetailView = ({ job, onBack, navigation }) => {
     statusStyle = styles.statusWithdrawn;
     statusTextStyle = styles.statusWithdrawnText;
   }
+
+  const getCtaConfig = () => {
+    if (job.statusType === 'declined' || job.statusType === 'withdrawn') {
+      return { label: 'Application Closed', disabled: true };
+    }
+    if (job.statusType === 'applied') {
+      return { label: 'Pending', disabled: true };
+    }
+    if (job.statusType === 'review') {
+      return { label: 'Under Review', disabled: true };
+    }
+    if (job.statusType === 'offer' || job.statusType === 'interview') {
+      return { label: 'View Interview Details', disabled: false };
+    }
+    return { label: 'Continue Application', disabled: false };
+  };
+
+  const ctaConfig = getCtaConfig();
 
   return (
     <SafeAreaView style={detailStyles.container}>
@@ -388,18 +422,16 @@ const JobDetailView = ({ job, onBack, navigation }) => {
         <TouchableOpacity style={detailStyles.saveButton}>
           <MaterialCommunityIcons name="bookmark-outline" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        {job.statusType !== 'declined' && job.statusType !== 'withdrawn' ? (
+        {!ctaConfig.disabled ? (
           <TouchableOpacity
             style={detailStyles.applyButton}
             onPress={() => navigation?.navigate('TrackApplication', { job })}
           >
-            <Text style={detailStyles.applyButtonText}>
-              {job.statusType === 'interview' ? 'View Interview Details' : 'Continue Application'}
-            </Text>
+            <Text style={detailStyles.applyButtonText}>{ctaConfig.label}</Text>
           </TouchableOpacity>
         ) : (
           <View style={[detailStyles.applyButton, detailStyles.applyButtonDisabled]}>
-            <Text style={detailStyles.applyButtonText}>Application Closed</Text>
+            <Text style={detailStyles.applyButtonText}>{ctaConfig.label}</Text>
           </View>
         )}
       </View>

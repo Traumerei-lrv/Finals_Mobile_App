@@ -128,6 +128,8 @@ service cloud.firestore {
           'resumeUrl',
           'resumePath',
           'resumeFileName',
+          'resumeFileSize',
+          'resumeMimeType',
           'screening1',
           'noticePeriod',
           'status',
@@ -165,10 +167,11 @@ service cloud.firestore {
     match /jobs/{jobId} {
       allow read: if isSignedIn();
       allow create: if isRecruiter() && validJobPayload();
-      allow update: if isRecruiter() &&
+      // Recruiter can update/delete their own jobs; Admins can manage jobs globally
+      allow update: if isAdmin() || (isRecruiter() &&
         resource.data.recruiterId == request.auth.uid &&
-        request.resource.data.recruiterId == resource.data.recruiterId;
-      allow delete: if isRecruiter() && resource.data.recruiterId == request.auth.uid;
+        request.resource.data.recruiterId == resource.data.recruiterId);
+      allow delete: if isAdmin() || (isRecruiter() && resource.data.recruiterId == request.auth.uid);
     }
 
     match /applications/{applicationId} {
@@ -184,9 +187,42 @@ service cloud.firestore {
         (resource.data.recruiterId == request.auth.uid &&
          request.resource.data.recruiterId == resource.data.recruiterId &&
          request.resource.data.applicantId == resource.data.applicantId &&
-         request.resource.data.jobId == resource.data.jobId)
+         request.resource.data.jobId == resource.data.jobId) ||
+        (
+          resource.data.applicantId == request.auth.uid &&
+          request.resource.data.recruiterId == resource.data.recruiterId &&
+          request.resource.data.applicantId == resource.data.applicantId &&
+          request.resource.data.jobId == resource.data.jobId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'applicantArchived',
+            'applicantArchivedAt',
+            'updatedAt'
+          ]) &&
+          request.resource.data.applicantArchived == true
+        ) ||
+        (
+          resource.data.applicantId == request.auth.uid &&
+          request.resource.data.recruiterId == resource.data.recruiterId &&
+          request.resource.data.applicantId == resource.data.applicantId &&
+          request.resource.data.jobId == resource.data.jobId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status',
+            'statusType',
+            'withdrawnAt',
+            'updatedAt'
+          ]) &&
+          request.resource.data.status == 'WITHDRAWN' &&
+          request.resource.data.statusType == 'withdrawn'
+        )
       );
       allow delete: if false;
+    }
+
+    // Admin action audit log: only admins can write and read these records
+    match /adminActions/{actionId} {
+      allow create: if isAdmin() && request.resource.data.keys().hasAll(['actorId','action','targetType','targetId','timestamp']);
+      allow read: if isAdmin();
+      allow update, delete: if false;
     }
 
     match /{document=**} {

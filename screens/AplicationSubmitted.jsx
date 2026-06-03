@@ -37,7 +37,7 @@ const SuccessScreen = () => {
         <TouchableOpacity style={styles.headerButton}>
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerLogo}>JobFinder</Text>
+        <Text style={styles.headerLogo}>Career Go</Text>
         <TouchableOpacity style={styles.headerButton}>
           <MaterialCommunityIcons name="more-vertical" size={24} color={COLORS.primary} />
         </TouchableOpacity>

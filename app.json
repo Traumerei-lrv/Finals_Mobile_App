@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "Finals_Mobile_App",
-    "slug": "Finals_Mobile_App",
+    "name": "Career Go",
+    "slug": "career-go",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "scheme": "finalsmobileapp",
+    "scheme": "careergo",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",

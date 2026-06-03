@@ -1,5 +1,6 @@
 import React from 'react';
 import { useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -16,6 +17,9 @@ import RecruiterBottomNav from '../../components/RecruiterBottomNav';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase';
 import LogoutConfirmModal from '../../components/LogoutConfirmModal';
+import { useAuthContext } from '../../context/AuthContext';
+import { subscribeToRecruiterJobs } from '../../utils/jobsFirestore';
+import { subscribeToRecruiterApplications } from '../../utils/applicationsFirestore';
 
 const { width } = Dimensions.get('window');
 
@@ -35,8 +39,63 @@ const COLORS = {
 };
 
 const CompanyAccountProfileScreen = ({ navigation }) => {
+  const { user, recruiterProfile, userProfile } = useAuthContext();
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [jobs, setJobs] = useState([]);
+  const [applications, setApplications] = useState([]);
+  const recruiterName =
+    recruiterProfile?.fullName ||
+    userProfile?.fullName ||
+    user?.displayName ||
+    'Recruiter';
+  const companyName = recruiterProfile?.company?.trim() || 'Your Company';
+  const recruiterEmail = recruiterProfile?.email || userProfile?.email || user?.email || 'No email';
+  const initials = recruiterName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || 'R';
+  const aboutCompany =
+    recruiterProfile?.about ||
+    recruiterProfile?.description ||
+    `Recruiting team profile for ${companyName}. Update your company description to help candidates understand your mission and culture.`;
+
+  useEffect(() => {
+    const recruiterId = auth.currentUser?.uid ?? null;
+    const unsubscribeJobs = subscribeToRecruiterJobs({
+      recruiterId,
+      onData: setJobs,
+      onError: (error) => console.error('Recruiter profile jobs subscription error', error),
+    });
+    const unsubscribeApplications = subscribeToRecruiterApplications({
+      recruiterId,
+      onData: setApplications,
+      onError: (error) => console.error('Recruiter profile applications subscription error', error),
+    });
+
+    return () => {
+      unsubscribeJobs();
+      unsubscribeApplications();
+    };
+  }, []);
+
+  const totalActiveJobs = useMemo(
+    () => jobs.filter((job) => String(job?.status ?? 'open').toLowerCase() !== 'closed').length,
+    [jobs],
+  );
+  const totalApplicants = applications.length;
+  const hiresThisQuarter = useMemo(() => {
+    const now = new Date();
+    const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+    const quarterStart = new Date(now.getFullYear(), quarterStartMonth, 1).getTime();
+    return applications.filter((application) => {
+      const isApproved = String(application?.statusType ?? '').toLowerCase() === 'offer';
+      const createdAtMs = application?.createdAtMs ?? 0;
+      return isApproved && createdAtMs >= quarterStart;
+    }).length;
+  }, [applications]);
 
   const handleLogoutConfirm = async () => {
     setLogoutLoading(true);
@@ -57,13 +116,13 @@ const CompanyAccountProfileScreen = ({ navigation }) => {
         <TouchableOpacity style={styles.iconButton}>
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>JobFinder</Text>
+        <Text style={styles.headerTitle}>Career Go</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.iconButton}>
             <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
           </TouchableOpacity>
           <View style={styles.profileAvatarPlaceholder}>
-            <Text style={styles.avatarInitial}>VC</Text>
+            <Text style={styles.avatarInitial}>{initials}</Text>
           </View>
         </View>
       </View>
@@ -77,25 +136,25 @@ const CompanyAccountProfileScreen = ({ navigation }) => {
              </View>
           </View>
           
-          <Text style={styles.companyName}>Velocity Corp</Text>
+          <Text style={styles.companyName}>{companyName}</Text>
           <View style={styles.verifiedBadge}>
             <Text style={styles.verifiedText}>VERIFIED ENTERPRISE</Text>
           </View>
 
           <View style={styles.metaRow}>
             <MaterialCommunityIcons name="office-building" size={16} color={COLORS.secondary} />
-            <Text style={styles.metaText}>Information Technology</Text>
+            <Text style={styles.metaText}>{recruiterName}</Text>
           </View>
           <View style={styles.metaRow}>
-            <MaterialCommunityIcons name="map-marker-outline" size={16} color={COLORS.secondary} />
-            <Text style={styles.metaText}>San Francisco, CA (HQ)</Text>
+            <MaterialCommunityIcons name="email-outline" size={16} color={COLORS.secondary} />
+            <Text style={styles.metaText}>{recruiterEmail}</Text>
           </View>
           <View style={styles.metaRow}>
             <MaterialCommunityIcons name="account-group-outline" size={16} color={COLORS.secondary} />
             <Text style={styles.metaText}>500-1,000 Employees</Text>
           </View>
 
-          <TouchableOpacity style={styles.editButton}>
+          <TouchableOpacity style={styles.editButton} onPress={() => navigation.navigate('EditRecruiterProfile')}>
              <MaterialCommunityIcons name="pencil-outline" size={18} color={COLORS.white} />
              <Text style={styles.editButtonText}>Edit Profile</Text>
           </TouchableOpacity>
@@ -105,27 +164,25 @@ const CompanyAccountProfileScreen = ({ navigation }) => {
         <View style={styles.metricsContainer}>
           <MetricItem 
             label="Total Active Jobs" 
-            value="24" 
+            value={String(totalActiveJobs)} 
             icon="briefcase-outline" 
           />
           <MetricItem 
             label="Total Applicants" 
-            value="842" 
+            value={String(totalApplicants)} 
             icon="account-group-outline" 
           />
           <MetricItem 
             label="Hires this Quarter" 
-            value="12" 
+            value={String(hiresThisQuarter)} 
             icon="star-outline" 
           />
         </View>
 
         {/* About Company Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>About Velocity Corp</Text>
-          <Text style={styles.cardBody}>
-            Velocity Corp is at the forefront of cloud infrastructure and data intelligence. We empower global enterprises with scalable solutions that drive digital transformation. Our culture is built on the principles of rapid innovation, radical transparency, and an unwavering commitment to professional growth. We don't just build software; we build the future of connectivity.
-          </Text>
+          <Text style={styles.cardTitle}>About {companyName}</Text>
+          <Text style={styles.cardBody}>{aboutCompany}</Text>
           
           <View style={styles.highlightsRow}>
              <View style={styles.highlightBadge}>

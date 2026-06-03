@@ -105,6 +105,32 @@ export function subscribeToOpenJobs(onJobs, onError) {
   );
 }
 
+export function subscribeToRecruiterJobs({ recruiterId, onData, onError }) {
+  if (!recruiterId) {
+    onData([]);
+    return () => {};
+  }
+
+  return onSnapshot(
+    collection(db, 'jobs'),
+    (snapshot) => {
+      const nextJobs = snapshot.docs
+        .map((jobDoc) => normalizeJob(jobDoc.data(), jobDoc.id))
+        .filter((job) => job.recruiterId === recruiterId)
+        .sort((a, b) => b.createdAtMs - a.createdAtMs);
+
+      onData(nextJobs);
+    },
+    (error) => {
+      if (typeof onError === 'function') {
+        onError(error);
+      } else {
+        console.error('Failed to subscribe recruiter jobs', error);
+      }
+    },
+  );
+}
+
 export function searchJobsFromList(jobs, query) {
   const normalizedQuery = String(query ?? '').trim().toLowerCase();
   if (!normalizedQuery) return jobs;
@@ -137,6 +163,23 @@ export async function createRecruiterJobPosting({ recruiterId, draft }) {
   const location = draft?.location?.trim() || 'Remote';
   const salary = draft?.salary?.trim() || 'Competitive';
   const type = draft?.type?.trim() || 'Full-time';
+  const skills = Array.isArray(draft?.skills)
+    ? draft.skills.map((item) => String(item).trim()).filter(Boolean)
+    : [];
+  const qualifications = Array.isArray(draft?.qualifications)
+    ? draft.qualifications.map((item) => String(item).trim()).filter(Boolean)
+    : [];
+  const minExperience = draft?.minExperience?.trim?.() || '';
+  const education = draft?.education?.trim?.() || '';
+  const languages = Array.isArray(draft?.languages)
+    ? draft.languages.map((item) => String(item).trim()).filter(Boolean)
+    : [];
+  const qualificationLines = [
+    ...qualifications,
+    ...(minExperience ? [`Minimum experience: ${minExperience}`] : []),
+    ...(education ? [`Education: ${education}`] : []),
+    ...(languages.length ? [`Languages: ${languages.join(', ')}`] : []),
+  ];
 
   const payload = {
     recruiterId,
@@ -146,13 +189,13 @@ export async function createRecruiterJobPosting({ recruiterId, draft }) {
     salary,
     salaryPeriod: '/ year',
     type,
-    tags: [type],
+    tags: skills.length ? skills : [type],
     status: 'open',
     about:
       draft?.about?.trim() ||
       `${company} is looking for a ${role} to join the team and deliver meaningful product impact.`,
-    responsibilities: DEFAULT_RESPONSIBILITIES,
-    qualifications: DEFAULT_QUALIFICATIONS,
+    responsibilities: skills.length ? skills : DEFAULT_RESPONSIBILITIES,
+    qualifications: qualificationLines.length ? qualificationLines : DEFAULT_QUALIFICATIONS,
     icon: 'office-building',
     color: '#1a365d',
     createdAt: serverTimestamp(),

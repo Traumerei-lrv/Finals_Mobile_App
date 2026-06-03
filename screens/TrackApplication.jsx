@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Alert,
   StyleSheet,
   View,
   Text,
@@ -12,7 +13,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import BottomNav from '../components/BottomNav';
-import { withdrawAppliedJob } from '../utils/storage';
+import { withdrawApplicationForApplicant } from '../utils/applicationsFirestore';
 
 const { width } = Dimensions.get('window');
 
@@ -34,15 +35,42 @@ const COLORS = {
 
 const TrackApplicationScreen = ({ navigation, route }) => {
   const job = route?.params?.job ?? null;
+  const statusType = job?.statusType ?? 'applied';
+  const isAppliedOnly = statusType === 'applied';
+  const isUnderReview = statusType === 'review' || statusType === 'screened';
+  const isInterview = statusType === 'interview';
+  const isOffer = statusType === 'offer';
+  const interviewDetails = job?.interviewDetails ?? {};
+  const hasInterviewDetails = Boolean(
+    interviewDetails?.date ||
+    interviewDetails?.time ||
+    interviewDetails?.location ||
+    interviewDetails?.instructions,
+  );
+  const interviewDateTime = [interviewDetails?.date, interviewDetails?.time].filter(Boolean).join(' • ');
+  const statusBadgeText = isOffer
+    ? 'OFFER STAGE'
+    : isInterview
+      ? 'INTERVIEW STAGE'
+      : isUnderReview
+        ? 'UNDER REVIEW'
+        : statusType === 'withdrawn'
+          ? 'WITHDRAWN'
+          : 'APPLIED';
   const handleWithdrawApplication = async () => {
-    const sourceJobId =
-      job?.sourceJobId ?? (typeof job?.id === 'string' ? job.id.replace(/^submitted-/, '') : null);
-
-    if (sourceJobId) {
-      await withdrawAppliedJob(sourceJobId);
+    const applicationId = job?.id ?? null;
+    if (!applicationId) {
+      Alert.alert('Withdraw failed', 'Application ID is missing. Please try again from My Applications.');
+      return;
     }
 
-    navigation.navigate('Application', { initialTab: 'Archive' });
+    try {
+      await withdrawApplicationForApplicant({ applicationId });
+      navigation.navigate('Application', { initialTab: 'Archive' });
+    } catch (error) {
+      console.error('Withdraw application failed', error);
+      Alert.alert('Withdraw failed', 'Unable to withdraw this application right now. Please try again.');
+    }
   };
 
   return (
@@ -82,7 +110,7 @@ const TrackApplicationScreen = ({ navigation, route }) => {
             </View>
           </View>
           <View style={styles.statusBadge}>
-            <Text style={styles.statusBadgeText}>INTERVIEW STAGE</Text>
+            <Text style={styles.statusBadgeText}>{statusBadgeText}</Text>
           </View>
         </View>
 
@@ -97,26 +125,63 @@ const TrackApplicationScreen = ({ navigation, route }) => {
               description="Your application was successfully submitted."
               status="completed"
             />
-            <TimelineItem 
-              title="Under Review"
-              date="Oct 15"
-              description="A recruiter has reviewed your profile and portfolio."
-              status="completed"
-            />
-            <TimelineActiveItem 
-              title="Interview"
-              date="Oct 20"
-              description="Next: Technical Interview with the Design Team."
-            />
+            {isAppliedOnly ? (
+              <TimelineItem 
+                title="Under Review"
+                date="Pending"
+                description="Waiting for recruiter to review your profile."
+                status="pending"
+              />
+            ) : (
+              <TimelineItem 
+                title="Under Review"
+                date="Updated"
+                description="A recruiter has reviewed your profile and portfolio."
+                status="completed"
+              />
+            )}
+            {isInterview ? (
+              <TimelineActiveItem 
+                title="Interview"
+                date="Scheduled"
+                description="Next: Technical Interview with the team."
+                appointmentDateTime={interviewDateTime || 'Date/time to be confirmed'}
+                appointmentLocation={interviewDetails?.location || 'Location/link not provided'}
+              />
+            ) : (
+              <TimelineItem 
+                title="Interview"
+                date="Pending"
+                description="Interview stage will start once shortlisted."
+                status={isOffer ? 'completed' : 'pending'}
+              />
+            )}
             <TimelineItem 
               title="Offer"
-              date="Pending"
+              date={isOffer ? 'Updated' : 'Pending'}
               description="Final decision after interview rounds."
-              status="pending"
+              status={isOffer ? 'completed' : 'pending'}
               isLast
             />
           </View>
         </View>
+
+        {hasInterviewDetails ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Interview Details</Text>
+            <View style={styles.card}>
+              <Text style={styles.interviewTitle}>{interviewDetails?.interviewType || 'Interview'}</Text>
+              <Text style={styles.interviewMeta}>{interviewDateTime || 'Date/time to be confirmed'}</Text>
+              <Text style={styles.interviewMeta}>
+                {interviewDetails?.meetingFormat || 'Remote'} • {interviewDetails?.timezone || 'Timezone not set'}
+              </Text>
+              <Text style={styles.interviewMeta}>{interviewDetails?.location || 'Location/link not provided'}</Text>
+              {interviewDetails?.instructions ? (
+                <Text style={styles.interviewInstructions}>{interviewDetails.instructions}</Text>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
 
         {/* Hiring Team */}
         <View style={styles.section}>
@@ -194,7 +259,7 @@ const TimelineItem = ({ title, date, description, status, isLast }) => (
   </View>
 );
 
-const TimelineActiveItem = ({ title, date, description }) => (
+const TimelineActiveItem = ({ title, date, description, appointmentDateTime, appointmentLocation }) => (
   <View style={styles.timelineItem}>
     <View style={styles.timelineLeft}>
       <View style={styles.dotActive}>
@@ -215,8 +280,8 @@ const TimelineActiveItem = ({ title, date, description }) => (
           <MaterialCommunityIcons name="calendar-clock" size={24} color={COLORS.primary} />
         </View>
         <View style={styles.appointmentInfo}>
-          <Text style={styles.appointmentDateTime}>Oct 24, 2023 • 10:00 AM</Text>
-          <Text style={styles.appointmentLocation}>Google Meet Conference</Text>
+          <Text style={styles.appointmentDateTime}>{appointmentDateTime}</Text>
+          <Text style={styles.appointmentLocation}>{appointmentLocation}</Text>
         </View>
         <TouchableOpacity>
           <Text style={styles.addCalText}>Add to Cal</Text>
@@ -455,6 +520,24 @@ const styles = StyleSheet.create({
   appointmentLocation: {
     fontSize: 12,
     color: COLORS.onSurfaceVariant,
+  },
+  interviewTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.primary,
+    marginBottom: 8,
+  },
+  interviewMeta: {
+    fontSize: 14,
+    color: COLORS.onSurfaceVariant,
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  interviewInstructions: {
+    marginTop: 10,
+    fontSize: 13,
+    color: COLORS.primary,
+    lineHeight: 20,
   },
   addCalText: {
     fontSize: 14,

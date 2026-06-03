@@ -38,7 +38,7 @@ const PrivacySettingsScreen = () => {
         <TouchableOpacity>
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerLogo}>JobFinder</Text>
+        <Text style={styles.headerLogo}>Career Go</Text>
         <TouchableOpacity>
           <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
         </TouchableOpacity>
@@ -71,7 +71,7 @@ const PrivacySettingsScreen = () => {
           <PrivacyToggle
             icon="database-outline"
             title="Data Sharing"
-            description="Allow JobFinder to share anonymized salary data with partners for market research."
+            description="Allow Career Go to share anonymized salary data with partners for market research."
             value={dataSharing}
             onValueChange={setDataSharing}
           />

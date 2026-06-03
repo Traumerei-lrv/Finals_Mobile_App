@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -8,6 +9,8 @@ import {
   View,
   Platform,
   Image,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { auth } from '../firebase';
@@ -27,10 +30,31 @@ const COLORS = {
   white: '#ffffff',
 };
 
+const OfficeLocation3D = React.lazy(() => import('../components/OfficeLocation3D'));
+
 export default function JobDetailsScreen({ navigation, route }) {
   const job = route?.params?.job ?? null;
   const [isSaved, setIsSaved] = useState(false);
   const [isApplied, setIsApplied] = useState(false);
+  const [isOfficePreviewExpanded, setIsOfficePreviewExpanded] = useState(false);
+
+  const locationLabel = useMemo(() => {
+    const details = [
+      job?.locationDetails?.city,
+      job?.locationDetails?.region,
+      job?.locationDetails?.country,
+    ].filter(Boolean);
+    return details.join(', ') || job?.location || 'Office address is currently unavailable';
+  }, [job]);
+
+  const coordinatesLabel = useMemo(() => {
+    const lat = Number(job?.locationCoordinates?.lat);
+    const lng = Number(job?.locationCoordinates?.lng);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      return null;
+    }
+    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  }, [job]);
 
   useEffect(() => {
     let isMounted = true;
@@ -153,8 +177,66 @@ export default function JobDetailsScreen({ navigation, route }) {
           {(job.qualifications ?? []).map((item, i) => (
             <RowItem key={`${item}-${i}`} icon="check-decagram-outline" text={item} />
           ))}
+
+          <Text style={styles.sectionTitle}>Office Location</Text>
+          <View style={styles.officeHeaderRow}>
+            <MaterialCommunityIcons name="office-building-marker-outline" size={18} color={COLORS.primary} />
+            <Text style={styles.officeLocationText}>{locationLabel}</Text>
+          </View>
+          {coordinatesLabel ? (
+            <View style={styles.officeCoordinatesRow}>
+              <MaterialCommunityIcons name="crosshairs-gps" size={16} color={COLORS.secondary} />
+              <Text style={styles.officeCoordinatesText}>{coordinatesLabel}</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.officeCard}>
+            <View style={styles.officeCanvasContainer}>
+              <Suspense fallback={<OfficeCanvasFallback message="Loading 3D office view..." />}>
+                <OfficeLocation3D height={220} interactive={false} />
+              </Suspense>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.expandOfficeButton}
+              onPress={() => setIsOfficePreviewExpanded(true)}
+            >
+              <MaterialCommunityIcons name="arrow-expand" size={18} color={COLORS.primary} />
+              <Text style={styles.expandOfficeButtonText}>View Larger</Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
+
+      <Modal
+        animationType="slide"
+        transparent
+        visible={isOfficePreviewExpanded}
+        onRequestClose={() => setIsOfficePreviewExpanded(false)}
+      >
+        <View style={styles.officeModalBackdrop}>
+          <View style={styles.officeModalSheet}>
+            <View style={styles.officeModalHeader}>
+              <View>
+                <Text style={styles.officeModalTitle}>Office Location</Text>
+                <Text style={styles.officeModalSubtitle}>{locationLabel}</Text>
+              </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                style={styles.officeModalCloseButton}
+                onPress={() => setIsOfficePreviewExpanded(false)}
+              >
+                <MaterialCommunityIcons name="close" size={20} color={COLORS.primary} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.officeModalCanvasContainer}>
+              <Suspense fallback={<OfficeCanvasFallback message="Loading immersive office view..." />}>
+                <OfficeLocation3D height={360} interactive />
+              </Suspense>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.bottomBar}>
         {isApplied ? (
@@ -178,6 +260,13 @@ const RowItem = ({ icon, text }) => (
   <View style={styles.listItem}>
     <MaterialCommunityIcons name={icon} size={18} color={COLORS.primary} style={styles.listIcon} />
     <Text style={styles.listItemText}>{text}</Text>
+  </View>
+);
+
+const OfficeCanvasFallback = ({ message }) => (
+  <View style={styles.officeCanvasFallback}>
+    <ActivityIndicator size="small" color={COLORS.primary} />
+    <Text style={styles.officeCanvasFallbackText}>{message}</Text>
   </View>
 );
 
@@ -289,6 +378,116 @@ const styles = StyleSheet.create({
   listItem: { flexDirection: 'row', marginBottom: 16, alignItems: 'flex-start' },
   listIcon: { marginTop: 2, marginRight: 12 },
   listItemText: { flex: 1, fontSize: 15, color: COLORS.secondary, lineHeight: 22 },
+  officeHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  officeLocationText: {
+    flex: 1,
+    color: COLORS.secondary,
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '500',
+  },
+  officeCoordinatesRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  officeCoordinatesText: {
+    color: COLORS.secondary,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  officeCard: {
+    marginTop: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+    backgroundColor: '#eef2ff',
+    overflow: 'hidden',
+  },
+  officeCanvasContainer: {
+    height: 220,
+    backgroundColor: '#f2f6ff',
+  },
+  officeCanvasFallback: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  officeCanvasFallbackText: {
+    color: COLORS.secondary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  expandOfficeButton: {
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outline,
+    backgroundColor: COLORS.white,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 46,
+  },
+  expandOfficeButtonText: {
+    color: COLORS.primary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  officeModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(12, 24, 41, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  officeModalSheet: {
+    height: '78%',
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 18,
+  },
+  officeModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  officeModalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  officeModalSubtitle: {
+    marginTop: 4,
+    color: COLORS.secondary,
+    fontSize: 13,
+    fontWeight: '500',
+    maxWidth: 280,
+  },
+  officeModalCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  officeModalCanvasContainer: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+    backgroundColor: '#f2f6ff',
+  },
   bottomBar: {
     position: 'absolute',
     bottom: 0,

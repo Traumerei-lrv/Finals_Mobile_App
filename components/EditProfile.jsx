@@ -94,7 +94,7 @@ const EditProfileScreen = () => {
                 onChangeText={setHeadline}
                 placeholder="e.g. Senior Product Designer"
               />
-              <Text style={styles.inputHelp}>Example: Senior Product Designer at JobFinder</Text>
+              <Text style={styles.inputHelp}>Example: Senior Product Designer at Career Go</Text>
             </View>
 
             <View style={styles.inputGroup}>

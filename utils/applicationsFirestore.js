@@ -6,6 +6,7 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  updateDoc,
   where,
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -28,6 +29,11 @@ function toDateLabel(value) {
 }
 
 function normalizeApplication(raw, id) {
+  const interviewDetails =
+    raw?.interviewDetails && typeof raw.interviewDetails === 'object'
+      ? raw.interviewDetails
+      : {};
+
   return {
     id,
     jobId: raw?.jobId,
@@ -50,6 +56,24 @@ function normalizeApplication(raw, id) {
     createdAtMs: toMillis(raw?.createdAt ?? raw?.appliedAt),
     screening1: raw?.screening1 ?? '',
     noticePeriod: raw?.noticePeriod ?? '',
+    resumeUrl: raw?.resumeUrl ?? null,
+    resumePath: raw?.resumePath ?? null,
+    resumeFileName: raw?.resumeFileName ?? null,
+    resumeFileSize: raw?.resumeFileSize ?? null,
+    resumeMimeType: raw?.resumeMimeType ?? null,
+    recruiterArchived: raw?.recruiterArchived === true,
+    applicantArchived: raw?.applicantArchived === true,
+    interviewDetails: {
+      interviewType: interviewDetails?.interviewType ?? raw?.interviewType ?? '',
+      meetingFormat: interviewDetails?.meetingFormat ?? raw?.meetingFormat ?? '',
+      date: interviewDetails?.date ?? raw?.interviewDate ?? '',
+      time: interviewDetails?.time ?? raw?.interviewTime ?? '',
+      timezone: interviewDetails?.timezone ?? raw?.interviewTimezone ?? '',
+      location: interviewDetails?.location ?? raw?.interviewLocation ?? '',
+      instructions: interviewDetails?.instructions ?? raw?.interviewInstructions ?? '',
+      scheduledAt: interviewDetails?.scheduledAt ?? raw?.interviewScheduledAt ?? null,
+      scheduledBy: interviewDetails?.scheduledBy ?? raw?.interviewScheduledBy ?? null,
+    },
   };
 }
 
@@ -61,14 +85,25 @@ export async function submitJobApplication({ job, applicant, formData }) {
     throw new Error('Missing job/applicant context');
   }
 
-  const existing = await getDoc(doc(db, 'applications', appDocId(jobId, applicantId)));
-  if (existing.exists()) {
-    throw new Error('You already applied to this job.');
+  const jobSnap = await getDoc(doc(db, 'jobs', jobId));
+  if (!jobSnap.exists()) {
+    throw new Error('This job is no longer available.');
+  }
+
+  const liveJob = jobSnap.data() ?? {};
+  const recruiterId = liveJob?.recruiterId ?? job?.recruiterId ?? null;
+
+  if (!recruiterId) {
+    throw new Error('Unable to determine recruiter for this job.');
+  }
+
+  if (liveJob?.status !== 'open') {
+    throw new Error('This job is closed and no longer accepting applications.');
   }
 
   const payload = {
     jobId,
-    recruiterId: job?.recruiterId ?? null,
+    recruiterId,
     applicantId,
     applicantName: formData?.fullName?.trim() || applicant?.displayName || 'Career Go User',
     applicantEmail: formData?.email?.trim() || applicant?.email || null,
@@ -83,19 +118,31 @@ export async function submitJobApplication({ job, applicant, formData }) {
     appliedAt: serverTimestamp(),
     createdAt: serverTimestamp(),
     job: {
-      id: job.id,
-      role: job.role,
-      company: job.company,
-      location: job.location,
-      salary: job.salary,
-      salaryPeriod: job.salaryPeriod ?? '/ year',
-      type: job.type ?? 'Full-time',
-      tags: Array.isArray(job.tags) ? job.tags : [job.type ?? 'Full-time'],
-      about: job.about ?? '',
+      id: jobId,
+      role: liveJob.role ?? job?.role ?? 'Untitled Role',
+      company: liveJob.company ?? job?.company ?? 'Unknown Company',
+      location: liveJob.location ?? job?.location ?? 'Remote',
+      salary: liveJob.salary ?? job?.salary ?? 'Competitive',
+      salaryPeriod: liveJob.salaryPeriod ?? job?.salaryPeriod ?? '/ year',
+      type: liveJob.type ?? job?.type ?? 'Full-time',
+      tags: Array.isArray(liveJob.tags)
+        ? liveJob.tags
+        : Array.isArray(job?.tags)
+          ? job.tags
+          : [liveJob.type ?? job?.type ?? 'Full-time'],
+      about: liveJob.about ?? job?.about ?? '',
     },
   };
 
-  await setDoc(doc(db, 'applications', appDocId(jobId, applicantId)), payload);
+  try {
+    await setDoc(doc(db, 'applications', appDocId(jobId, applicantId)), payload);
+  } catch (error) {
+    const code = String(error?.code ?? '').toLowerCase();
+    if (code.includes('permission-denied')) {
+      throw new Error('Missing or insufficient permissions. Please refresh and try again.');
+    }
+    throw error;
+  }
 }
 
 export async function hasApplicantAppliedToJob({ jobId, applicantId }) {
@@ -104,7 +151,7 @@ export async function hasApplicantAppliedToJob({ jobId, applicantId }) {
   return snap.exists();
 }
 
-export function subscribeToRecruiterApplications({ recruiterId, onData, onError }) {
+export function subscribeToRecruiterApplications({ recruiterId, onData, onError, includeArchived = false }) {
   if (!recruiterId) {
     onData([]);
     return () => {};
@@ -116,6 +163,7 @@ export function subscribeToRecruiterApplications({ recruiterId, onData, onError 
     (snapshot) => {
       const applications = snapshot.docs
         .map((applicationDoc) => normalizeApplication(applicationDoc.data(), applicationDoc.id))
+        .filter((application) => (includeArchived ? application.recruiterArchived : !application.recruiterArchived))
         .sort((a, b) => b.createdAtMs - a.createdAtMs);
       onData(applications);
     },
@@ -138,6 +186,7 @@ export function subscribeToApplicantApplications({ applicantId, onData, onError 
     (snapshot) => {
       const applications = snapshot.docs
         .map((applicationDoc) => normalizeApplication(applicationDoc.data(), applicationDoc.id))
+        .filter((application) => !application.applicantArchived)
         .sort((a, b) => b.createdAtMs - a.createdAtMs);
       onData(applications);
     },
@@ -162,16 +211,56 @@ export function mapApplicationToRecruiterCard(application) {
 }
 
 export function mapApplicationToJobSeekerCard(application) {
+  const normalizedType = String(application.statusType ?? 'applied').toLowerCase();
+  const normalizedStatus = String(application.status ?? 'APPLIED').toUpperCase();
+
+  let displayStatus = normalizedStatus;
+  let statusTypeForTabs = normalizedType;
+  let step = 'Step 1 of 4';
+  let progress = 0.25;
+
+  if (normalizedType === 'applied') {
+    displayStatus = 'APPLIED';
+    statusTypeForTabs = 'applied';
+    step = 'Step 1 of 4';
+    progress = 0.25;
+  } else if (normalizedType === 'screened' || normalizedType === 'review') {
+    displayStatus = 'UNDER REVIEW';
+    statusTypeForTabs = 'review';
+    step = 'Step 2 of 4';
+    progress = 0.5;
+  } else if (normalizedType === 'interview') {
+    displayStatus = 'INTERVIEW';
+    statusTypeForTabs = 'interview';
+    step = 'Step 3 of 4';
+    progress = 0.75;
+  } else if (normalizedType === 'offer') {
+    displayStatus = normalizedStatus === 'APPROVED' ? 'APPROVED' : 'OFFER';
+    statusTypeForTabs = 'offer';
+    step = 'Step 4 of 4';
+    progress = 1;
+  } else if (normalizedType === 'declined') {
+    displayStatus = 'DECLINED';
+    statusTypeForTabs = 'declined';
+    step = 'Closed';
+    progress = 1;
+  } else if (normalizedType === 'withdrawn') {
+    displayStatus = 'WITHDRAWN';
+    statusTypeForTabs = 'withdrawn';
+    step = 'Closed';
+    progress = 1;
+  }
+
   return {
     id: application.id,
     sourceJobId: application.jobId,
     role: application.role,
     company: application.company,
     date: `Applied ${toDateLabel(application.appliedAt)}`,
-    status: application.status === 'APPLIED' ? 'UNDER REVIEW' : application.status,
-    statusType: application.statusType === 'applied' ? 'review' : application.statusType,
-    step: application.statusType === 'declined' ? 'Closed' : 'Step 1 of 4',
-    progress: application.statusType === 'declined' ? 1 : 0.25,
+    status: displayStatus,
+    statusType: statusTypeForTabs,
+    step,
+    progress,
     icon: 'file-document-outline',
     location: application.location,
     salary: application.salary,
@@ -182,5 +271,86 @@ export function mapApplicationToJobSeekerCard(application) {
       `${application.company} is reviewing your application for ${application.role}. We will share updates soon.`,
     responsibilities: ['Application submitted successfully.', 'Awaiting recruiter review.'],
     qualifications: ['Profile submitted', 'Resume uploaded'],
+    interviewDetails: application.interviewDetails ?? null,
   };
+}
+
+export async function updateApplicationStatus({ applicationId, status, statusType }) {
+  if (!applicationId) {
+    throw new Error('Missing applicationId');
+  }
+
+  const normalizedType = String(statusType ?? status ?? 'applied').toLowerCase();
+  const normalizedStatus = String(status ?? normalizedType).toUpperCase();
+
+  await updateDoc(doc(db, 'applications', applicationId), {
+    status: normalizedStatus,
+    statusType: normalizedType,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function approveApplicationWithInterview({
+  applicationId,
+  interviewDetails,
+}) {
+  if (!applicationId) {
+    throw new Error('Missing applicationId');
+  }
+
+  const payload = {
+    status: 'APPROVED',
+    statusType: 'offer',
+    updatedAt: serverTimestamp(),
+    interviewDetails: {
+      interviewType: interviewDetails?.interviewType?.trim() ?? '',
+      meetingFormat: interviewDetails?.meetingFormat?.trim() ?? '',
+      date: interviewDetails?.date?.trim() ?? '',
+      time: interviewDetails?.time?.trim() ?? '',
+      timezone: interviewDetails?.timezone?.trim() ?? '',
+      location: interviewDetails?.location?.trim() ?? '',
+      instructions: interviewDetails?.instructions?.trim() ?? '',
+      scheduledBy: interviewDetails?.scheduledBy ?? null,
+      scheduledAt: serverTimestamp(),
+    },
+  };
+
+  await updateDoc(doc(db, 'applications', applicationId), payload);
+}
+
+export async function archiveDeclinedApplicationForRecruiter({ applicationId }) {
+  if (!applicationId) {
+    throw new Error('Missing applicationId');
+  }
+
+  await updateDoc(doc(db, 'applications', applicationId), {
+    recruiterArchived: true,
+    recruiterArchivedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function archiveApplicationForApplicant({ applicationId }) {
+  if (!applicationId) {
+    throw new Error('Missing applicationId');
+  }
+
+  await updateDoc(doc(db, 'applications', applicationId), {
+    applicantArchived: true,
+    applicantArchivedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function withdrawApplicationForApplicant({ applicationId }) {
+  if (!applicationId) {
+    throw new Error('Missing applicationId');
+  }
+
+  await updateDoc(doc(db, 'applications', applicationId), {
+    status: 'WITHDRAWN',
+    statusType: 'withdrawn',
+    withdrawnAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
 }

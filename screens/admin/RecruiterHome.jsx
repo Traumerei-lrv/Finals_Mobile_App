@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -6,14 +6,15 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
-  Image,
-  Dimensions,
   Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import RecruiterBottomNav from '../../components/RecruiterBottomNav';
-
-const { width } = Dimensions.get('window');
+import RecruiterSidebarMenu from '../../components/RecruiterSidebarMenu';
+import { useAuthContext } from '../../context/AuthContext';
+import { auth } from '../../firebase';
+import { subscribeToRecruiterJobs } from '../../utils/jobsFirestore';
+import { subscribeToRecruiterApplications } from '../../utils/applicationsFirestore';
 
 // Design Tokens (Professional Velocity - matching DS_2)
 const COLORS = {
@@ -35,14 +36,62 @@ const COLORS = {
 };
 
 const RecruiterDashboardNoAIScreen = ({ navigation }) => {
+  const [jobs, setJobs] = useState([]);
+  const [applications, setApplications] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { isAdmin } = useAuthContext();
+
+  useEffect(() => {
+    const recruiterId = auth.currentUser?.uid ?? null;
+    const unsubscribeJobs = subscribeToRecruiterJobs({
+      recruiterId,
+      onData: setJobs,
+      onError: (error) => console.error('Recruiter jobs subscription error', error),
+    });
+    const unsubscribeApplications = subscribeToRecruiterApplications({
+      recruiterId,
+      onData: setApplications,
+      onError: (error) => console.error('Recruiter applications subscription error', error),
+    });
+
+    return () => {
+      unsubscribeJobs();
+      unsubscribeApplications();
+    };
+  }, []);
+
+  const applicantsByJobId = useMemo(() => {
+    const grouped = {};
+    applications.forEach((application) => {
+      const jobId = application.jobId;
+      if (!jobId) return;
+      grouped[jobId] = (grouped[jobId] ?? 0) + 1;
+    });
+    return grouped;
+  }, [applications]);
+
+  const pendingApplications = useMemo(
+    () => applications.filter((application) => application.statusType === 'applied').length,
+    [applications],
+  );
+
+  const recentJobs = useMemo(() => jobs.slice(0, 6), [jobs]);
+
   return (
     <SafeAreaView style={styles.container}>
+      <RecruiterSidebarMenu
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        navigation={navigation}
+        activeRoute="RecruiterHome"
+        showAdmin={isAdmin && typeof isAdmin === 'function' ? isAdmin() : false}
+      />
       {/* Top App Bar */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.iconButton}>
+        <TouchableOpacity style={styles.iconButton} onPress={() => setSidebarOpen(true)}>
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>JobFinder</Text>
+        <Text style={styles.headerTitle}>Career Go</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.iconButton}>
             <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
@@ -63,19 +112,19 @@ const RecruiterDashboardNoAIScreen = ({ navigation }) => {
           <OverviewCard 
             icon="briefcase-variant" 
             label="ACTIVE LISTINGS" 
-            value="24" 
+            value={String(jobs.filter((job) => job.status !== 'closed').length)} 
             iconBg={COLORS.primary}
           />
           <OverviewCard 
             icon="account-group" 
             label="NEW APPLICANTS" 
-            value="142" 
+            value={String(applications.length)} 
             iconBg={COLORS.primary}
           />
           <OverviewCard 
             icon="calendar-blank" 
-            label="INTERVIEWS" 
-            value="12" 
+            label="PENDING REVIEW" 
+            value={String(pendingApplications)} 
             iconBg="#E8F0FE"
             iconColor={COLORS.primary}
           />
@@ -91,61 +140,39 @@ const RecruiterDashboardNoAIScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.jobList}>
-          <JobPostingCard 
-            title="Senior Product Designer"
-            meta="Posted 2 days ago • London, UK"
-            applicants="48 Applicants"
-            shortlisted="8 Shortlisted"
-            status="OPEN"
-          />
-          <JobPostingCard 
-            title="Backend Engineer (Go)"
-            meta="Posted 5 days ago • Remote"
-            applicants="112 Applicants"
-            shortlisted="15 Shortlisted"
-            status="OPEN"
-          />
-          <JobPostingCard 
-            title="QA Lead"
-            meta="Posted 14 days ago • Berlin, DE"
-            applicants="25 Applicants"
-            status="CLOSED"
-            hired
-          />
+          {!recentJobs.length ? (
+            <View style={styles.emptyStateCard}>
+              <Text style={styles.emptyStateTitle}>No job posts yet</Text>
+              <Text style={styles.emptyStateSubtitle}>Create a posting and it will appear here automatically.</Text>
+            </View>
+          ) : null}
+          {recentJobs.map((job) => {
+            const applicantsCount = applicantsByJobId[job.id] ?? 0;
+            const status = job.status === 'closed' ? 'CLOSED' : 'OPEN';
+            return (
+              <JobPostingCard
+                key={job.id}
+                title={job.role}
+                meta={`${job.posted} • ${job.location}`}
+                applicants={`${applicantsCount} Applicant${applicantsCount === 1 ? '' : 's'}`}
+                status={status}
+                onPress={() => navigation.navigate('ApplicantsList', { jobId: job.id, jobTitle: job.role })}
+              />
+            );
+          })}
         </View>
 
         {/* Pending Review */}
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Pending Review</Text>
           <View style={styles.newBadge}>
-            <Text style={styles.newBadgeText}>8 New</Text>
+            <Text style={styles.newBadgeText}>{pendingApplications} New</Text>
           </View>
         </View>
 
-        <View style={styles.reviewList}>
-          <CandidateReviewItem 
-            name="Marcus Thorne"
-            role="Senior Product Designer"
-            description="&quot;8+ years exp in FinTech...&quot;"
-            avatar="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=200&auto=format&fit=crop"
-          />
-          <CandidateReviewItem 
-            name="Sarah Jenkins"
-            role="Backend Engineer"
-            description="&quot;Expertise in Go and AWS...&quot;"
-            avatar="https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop"
-          />
-          <CandidateReviewItem 
-            name="David Chen"
-            role="Product Manager"
-            description="&quot;Led teams of 15+ at Google...&quot;"
-            avatar="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=200&auto=format&fit=crop"
-          />
-          
-          <TouchableOpacity style={styles.processAllButton}>
-            <Text style={styles.processAllText}>Process All New Applications</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.processAllButton} onPress={() => navigation.navigate('ApplicantsList')}>
+          <Text style={styles.processAllText}>Open Applicants Inbox</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       <RecruiterBottomNav navigation={navigation} activeTab="home" showFab />
@@ -165,8 +192,8 @@ const OverviewCard = ({ icon, label, value, iconBg, iconColor }) => (
   </View>
 );
 
-const JobPostingCard = ({ title, meta, applicants, shortlisted, status, hired }) => (
-  <View style={styles.jobCard}>
+const JobPostingCard = ({ title, meta, applicants, status, onPress }) => (
+  <TouchableOpacity style={styles.jobCard} onPress={onPress}>
     <View style={styles.jobCardHeader}>
       <Text style={styles.jobCardTitle}>{title}</Text>
       <View style={[styles.statusTag, status === 'OPEN' ? styles.tagOpen : styles.tagClosed]}>
@@ -177,27 +204,9 @@ const JobPostingCard = ({ title, meta, applicants, shortlisted, status, hired })
     <View style={styles.jobCardDivider} />
     <View style={styles.jobCardFooter}>
       <Text style={styles.jobCardApplicants}>{applicants}</Text>
-      {shortlisted ? (
-        <Text style={styles.jobCardShortlisted}>{shortlisted}</Text>
-      ) : hired ? (
-        <Text style={styles.hiredText}>Hired</Text>
-      ) : null}
+      <Text style={styles.jobCardShortlisted}>View applicants</Text>
     </View>
-  </View>
-);
-
-const CandidateReviewItem = ({ name, role, description, avatar }) => (
-  <View style={styles.reviewItem}>
-    <Image source={{ uri: avatar }} style={styles.candidateAvatar} />
-    <View style={styles.reviewContent}>
-      <Text style={styles.candidateName}>{name}</Text>
-      <Text style={styles.candidateRole}>{role}</Text>
-      <Text style={styles.candidateDesc}>{description}</Text>
-    </View>
-    <TouchableOpacity style={styles.chevronButton}>
-      <MaterialCommunityIcons name="chevron-right" size={24} color={COLORS.primary} />
-    </TouchableOpacity>
-  </View>
+  </TouchableOpacity>
 );
 
 const styles = StyleSheet.create({
@@ -378,6 +387,23 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: '800',
   },
+  emptyStateCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+  },
+  emptyStateTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.primary,
+    marginBottom: 4,
+  },
+  emptyStateSubtitle: {
+    fontSize: 13,
+    color: COLORS.secondary,
+  },
   newBadge: {
     backgroundColor: COLORS.primary,
     paddingHorizontal: 10,
@@ -389,59 +415,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
   },
-  reviewList: {
-    marginHorizontal: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.outline,
-    backgroundColor: COLORS.white,
-    overflow: 'hidden',
-  },
-  reviewItem: {
-    flexDirection: 'row',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outline,
-    alignItems: 'center',
-  },
-  candidateAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    marginRight: 16,
-  },
-  reviewContent: {
-    flex: 1,
-  },
-  candidateName: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: COLORS.primary,
-  },
-  candidateRole: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.primary,
-    marginBottom: 2,
-  },
-  candidateDesc: {
-    fontSize: 13,
-    color: COLORS.secondary,
-    fontStyle: 'italic',
-  },
-  chevronButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.outline,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   processAllButton: {
+    marginHorizontal: 20,
     backgroundColor: '#E8F0FE',
     paddingVertical: 16,
     alignItems: 'center',
+    borderRadius: 10,
   },
   processAllText: {
     fontSize: 14,
