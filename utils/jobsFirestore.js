@@ -1,8 +1,15 @@
 import {
   addDoc,
   collection,
+  doc,
+  getDoc,
+  getDocs,
   onSnapshot,
+  query,
   serverTimestamp,
+  updateDoc,
+  where,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -79,6 +86,7 @@ function normalizeJob(raw, id) {
         : DEFAULT_QUALIFICATIONS,
     recruiterId: raw?.recruiterId ?? null,
     status: raw?.status ?? 'open',
+    deletedAt: raw?.deletedAt ?? null,
     posted: raw?.posted ?? formatPostedLabel(postedAt),
     createdAtMs: toMillis(raw?.createdAt ?? raw?.postedAt),
   };
@@ -90,7 +98,7 @@ export function subscribeToOpenJobs(onJobs, onError) {
     (snapshot) => {
       const nextJobs = snapshot.docs
         .map((jobDoc) => normalizeJob(jobDoc.data(), jobDoc.id))
-        .filter((job) => job.status !== 'closed')
+        .filter((job) => job.status !== 'closed' && !job.deletedAt)
         .sort((a, b) => b.createdAtMs - a.createdAtMs);
 
       onJobs(nextJobs);
@@ -116,7 +124,7 @@ export function subscribeToRecruiterJobs({ recruiterId, onData, onError }) {
     (snapshot) => {
       const nextJobs = snapshot.docs
         .map((jobDoc) => normalizeJob(jobDoc.data(), jobDoc.id))
-        .filter((job) => job.recruiterId === recruiterId)
+        .filter((job) => job.recruiterId === recruiterId && !job.deletedAt)
         .sort((a, b) => b.createdAtMs - a.createdAtMs);
 
       onData(nextJobs);
@@ -204,4 +212,62 @@ export async function createRecruiterJobPosting({ recruiterId, draft }) {
 
   const ref = await addDoc(collection(db, 'jobs'), payload);
   return ref.id;
+}
+
+export async function deleteRecruiterJobPosting({ recruiterId, jobId }) {
+  if (!recruiterId) {
+    throw new Error('Missing recruiterId');
+  }
+
+  if (!jobId) {
+    throw new Error('Missing jobId');
+  }
+
+  const jobRef = doc(db, 'jobs', jobId);
+  const jobSnap = await getDoc(jobRef);
+
+  if (!jobSnap.exists()) {
+    return;
+  }
+
+  const jobData = jobSnap.data() ?? {};
+  if (jobData.recruiterId !== recruiterId) {
+    throw new Error('You can only delete your own job postings.');
+  }
+
+  try {
+    await updateDoc(jobRef, {
+      status: 'closed',
+      deletedAt: serverTimestamp(),
+      deletedBy: recruiterId,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    const code = String(error?.code ?? '').toLowerCase();
+    if (code.includes('permission-denied')) {
+      throw new Error(
+        'Delete blocked by Firestore rules for the job document. Ensure the recruiter owns the job and the latest firestore.rules are deployed.'
+      );
+    }
+    throw error;
+  }
+
+  try {
+    const applicationsSnap = await getDocs(query(collection(db, 'applications'), where('jobId', '==', jobId)));
+    const applicationRefs = applicationsSnap.docs.map((applicationDoc) => applicationDoc.ref);
+
+    for (let index = 0; index < applicationRefs.length; index += 450) {
+      const batch = writeBatch(db);
+      applicationRefs.slice(index, index + 450).forEach((ref) =>
+        batch.update(ref, {
+          recruiterArchived: true,
+          recruiterArchivedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+      );
+      await batch.commit();
+    }
+  } catch (error) {
+    console.warn('Recruiter job soft-delete succeeded, but archiving related applications failed', error);
+  }
 }

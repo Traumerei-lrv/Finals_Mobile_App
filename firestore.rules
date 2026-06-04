@@ -168,10 +168,11 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isRecruiter() && validJobPayload();
       // Recruiter can update/delete their own jobs; Admins can manage jobs globally
-      allow update: if isAdmin() || (isRecruiter() &&
+      allow update: if isAdmin() || (
         resource.data.recruiterId == request.auth.uid &&
-        request.resource.data.recruiterId == resource.data.recruiterId);
-      allow delete: if isAdmin() || (isRecruiter() && resource.data.recruiterId == request.auth.uid);
+        request.resource.data.recruiterId == resource.data.recruiterId
+      );
+      allow delete: if isAdmin() || resource.data.recruiterId == request.auth.uid;
     }
 
     match /applications/{applicationId} {
@@ -215,7 +216,7 @@ service cloud.firestore {
           request.resource.data.statusType == 'withdrawn'
         )
       );
-      allow delete: if false;
+      allow delete: if isAdmin() || resource.data.recruiterId == request.auth.uid;
     }
 
     // Admin action audit log: only admins can write and read these records

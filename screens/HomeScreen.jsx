@@ -253,30 +253,7 @@ const JobSeekerHome = ({ navigation }) => {
             </TouchableOpacity>
           ))}
         </View>
-
-        {/* Premium Banner */}
-        <View style={styles.premiumBanner}>
-          <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=2070&auto=format&fit=crop' }}
-            style={styles.premiumImage}
-          />
-          <View style={styles.premiumContent}>
-            <View style={styles.premiumBadge}><Text style={styles.premiumBadgeText}>PREMIUM</Text></View>
-            <Text style={styles.premiumTitle}>Stand out with AI-powered resume analysis</Text>
-            <Text style={styles.premiumDescription}>Our premium members get 3x more recruiter views with tailored suggestions for their job .</Text>
-            <TouchableOpacity style={styles.premiumButton}>
-              <Text style={styles.premiumButtonText}>Upgrade to Premium</Text>
-              <MaterialCommunityIcons name="lightning-bolt" size={18} color={COLORS.white} />
-            </TouchableOpacity>
-          </View>
-        </View>
       </ScrollView>
-
-      {/* Floating Action Button */}
-      <TouchableOpacity style={[styles.fab, { bottom: 96 + insets.bottom }]}>
-        <MaterialCommunityIcons name="pencil-outline" size={24} color={COLORS.white} />
-      </TouchableOpacity>
-
       {/* Bottom Nav Bar */}
       <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 12), minHeight: 82 + insets.bottom }]}>
         <TouchableOpacity style={styles.navItemActive} onPress={() => navigation.navigate('Home')}>

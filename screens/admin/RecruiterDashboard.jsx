@@ -23,6 +23,7 @@ import { auth } from '../../firebase';
 import {
   subscribeToRecruiterJobs,
   createRecruiterJobPosting,
+  deleteRecruiterJobPosting,
 } from '../../utils/jobsFirestore';
 import { subscribeToRecruiterApplications } from '../../utils/applicationsFirestore';
 
@@ -88,6 +89,7 @@ export default function RecruiterDashboard({ navigation, route }) {
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [creatingJob, setCreatingJob] = useState(false);
+  const [deletingJobId, setDeletingJobId] = useState(null);
   const [workMode, setWorkMode] = useState('Hybrid');
   const [formData, setFormData] = useState({
     jobTitle: '',
@@ -304,6 +306,44 @@ export default function RecruiterDashboard({ navigation, route }) {
     }
   };
 
+  const handleDeleteJob = (job) => {
+    if (!job?.id) {
+      return;
+    }
+
+    Alert.alert(
+      'Delete job posting',
+      `Delete "${job.role || job.title || 'this job'}"? This will also remove its related applications.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const recruiterId = auth.currentUser?.uid ?? null;
+            if (!recruiterId) {
+              Alert.alert('Sign in required', 'Please sign in again before deleting a job.');
+              return;
+            }
+
+            try {
+              setDeletingJobId(job.id);
+              await deleteRecruiterJobPosting({ recruiterId, jobId: job.id });
+              if (selectedJobId === job.id) {
+                setSelectedJobId(null);
+              }
+            } catch (error) {
+              console.error('Failed to delete recruiter job', error);
+              Alert.alert('Delete failed', error?.message || 'Unable to delete this job right now. Please try again.');
+            } finally {
+              setDeletingJobId((current) => (current === job.id ? null : current));
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const handleLogoutConfirm = async () => {
     setLogoutLoading(true);
     try {
@@ -372,6 +412,8 @@ export default function RecruiterDashboard({ navigation, route }) {
               applications={applications}
               applicantsCountByJobId={applicantsCountByJobId}
               onOpenApplicants={openApplicantsView}
+              onDeleteJob={handleDeleteJob}
+              deletingJobId={deletingJobId}
             />
           ) : null}
 
@@ -398,6 +440,8 @@ export default function RecruiterDashboard({ navigation, route }) {
               selectedJob={selectedJob}
               selectedJobApplications={selectedJobApplications}
               navigation={navigation}
+              onDeleteJob={handleDeleteJob}
+              deletingJobId={deletingJobId}
             />
           ) : null}
 
@@ -435,7 +479,7 @@ export default function RecruiterDashboard({ navigation, route }) {
   );
 }
 
-function HomeTab({ jobs, recentJobs, pendingApplications, applications, applicantsCountByJobId, onOpenApplicants }) {
+function HomeTab({ jobs, recentJobs, pendingApplications, applications, applicantsCountByJobId, onOpenApplicants, onDeleteJob, deletingJobId }) {
   return (
     <>
       <View style={styles.sectionHeader}>
@@ -485,11 +529,14 @@ function HomeTab({ jobs, recentJobs, pendingApplications, applications, applican
           return (
             <JobPostingCard
               key={job.id}
+              job={job}
               title={job.role}
               meta={`${job.posted} • ${job.location}`}
               applicants={`${applicantsCount} Applicant${applicantsCount === 1 ? '' : 's'}`}
               status={status}
               onPress={() => onOpenApplicants(job.id)}
+              onDelete={() => onDeleteJob(job)}
+              deleting={deletingJobId === job.id}
             />
           );
         })}
@@ -654,7 +701,7 @@ function PostJobTab({
   );
 }
 
-function ApplicantsTab({ selectedJobId, setSelectedJobId, search, setSearch, jobCards, selectedJob, selectedJobApplications, navigation }) {
+function ApplicantsTab({ selectedJobId, setSelectedJobId, search, setSearch, jobCards, selectedJob, selectedJobApplications, navigation, onDeleteJob, deletingJobId }) {
   return !selectedJobId ? (
     <>
       <View style={styles.listHeader}>
@@ -671,14 +718,18 @@ function ApplicantsTab({ selectedJobId, setSelectedJobId, search, setSearch, job
         ) : null}
 
         {jobCards.map((job) => (
-          <TouchableOpacity key={job.id} style={styles.jobCard} onPress={() => setSelectedJobId(job.id)}>
-            <Text style={styles.jobCardTitle}>{job.title}</Text>
-            <Text style={styles.jobCardMeta}>{job.posted} • {job.location}</Text>
-            <View style={styles.jobCardFooter}>
-              <Text style={styles.jobCardApplicants}>{job.applicants} Applicant{job.applicants === 1 ? '' : 's'}</Text>
-              <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.primary} />
-            </View>
-          </TouchableOpacity>
+          <JobPostingCard
+            key={job.id}
+            job={job}
+            title={job.title}
+            meta={`${job.posted} • ${job.location}`}
+            applicants={`${job.applicants} Applicant${job.applicants === 1 ? '' : 's'}`}
+            status="OPEN"
+            onPress={() => setSelectedJobId(job.id)}
+            onDelete={() => onDeleteJob(job)}
+            deleting={deletingJobId === job.id}
+            hideStatus
+          />
         ))}
       </View>
     </>
@@ -706,6 +757,18 @@ function ApplicantsTab({ selectedJobId, setSelectedJobId, search, setSearch, job
         <Text style={styles.subtitle}>
           {selectedJobApplications.length} candidate{selectedJobApplications.length === 1 ? '' : 's'} for this role.
         </Text>
+        {selectedJob ? (
+          <TouchableOpacity
+            style={[styles.inlineDeleteButton, deletingJobId === selectedJob.id && styles.inlineDeleteButtonDisabled]}
+            onPress={() => onDeleteJob(selectedJob)}
+            disabled={deletingJobId === selectedJob.id}
+          >
+            <MaterialCommunityIcons name="delete-outline" size={16} color={COLORS.danger} />
+            <Text style={styles.inlineDeleteButtonText}>
+              {deletingJobId === selectedJob.id ? 'Deleting...' : 'Delete Job'}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <View style={styles.applicantsList}>
@@ -837,20 +900,37 @@ function OverviewCard({ icon, label, value, iconBg, iconColor }) {
   );
 }
 
-function JobPostingCard({ title, meta, applicants, status, onPress }) {
+function JobPostingCard({ title, meta, applicants, status, onPress, onDelete, deleting = false, hideStatus = false }) {
   return (
     <TouchableOpacity style={styles.jobCard} onPress={onPress}>
       <View style={styles.jobCardHeader}>
         <Text style={styles.jobCardTitle}>{title}</Text>
-        <View style={[styles.statusTag, status === 'OPEN' ? styles.tagOpen : styles.tagClosed]}>
-          <Text style={[styles.statusTagText, status === 'OPEN' ? styles.tagOpenText : styles.tagClosedText]}>{status}</Text>
-        </View>
+        {hideStatus ? null : (
+          <View style={[styles.statusTag, status === 'OPEN' ? styles.tagOpen : styles.tagClosed]}>
+            <Text style={[styles.statusTagText, status === 'OPEN' ? styles.tagOpenText : styles.tagClosedText]}>{status}</Text>
+          </View>
+        )}
       </View>
       <Text style={styles.jobCardMeta}>{meta}</Text>
       <View style={styles.jobCardDivider} />
       <View style={styles.jobCardFooter}>
         <Text style={styles.jobCardApplicants}>{applicants}</Text>
-        <Text style={styles.jobCardShortlisted}>View applicants</Text>
+        <View style={styles.jobCardActions}>
+          {typeof onDelete === 'function' ? (
+            <TouchableOpacity
+              style={[styles.deleteJobButton, deleting && styles.deleteJobButtonDisabled]}
+              onPress={(event) => {
+                event?.stopPropagation?.();
+                onDelete();
+              }}
+              disabled={deleting}
+            >
+              <MaterialCommunityIcons name="delete-outline" size={14} color={COLORS.danger} />
+              <Text style={styles.deleteJobButtonText}>{deleting ? 'Deleting...' : 'Delete'}</Text>
+            </TouchableOpacity>
+          ) : null}
+          <Text style={styles.jobCardShortlisted}>View applicants</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -1075,6 +1155,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  jobCardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   jobCardApplicants: {
     fontSize: 14,
     color: COLORS.secondary,
@@ -1083,6 +1168,23 @@ const styles = StyleSheet.create({
   jobCardShortlisted: {
     fontSize: 14,
     color: COLORS.secondary,
+    fontWeight: '700',
+  },
+  deleteJobButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  deleteJobButtonDisabled: {
+    opacity: 0.7,
+  },
+  deleteJobButtonText: {
+    color: COLORS.danger,
+    fontSize: 12,
     fontWeight: '700',
   },
   emptyStateCard: {
@@ -1374,6 +1476,25 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: COLORS.secondary,
+  },
+  inlineDeleteButton: {
+    marginTop: 12,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  inlineDeleteButtonDisabled: {
+    opacity: 0.7,
+  },
+  inlineDeleteButtonText: {
+    color: COLORS.danger,
+    fontSize: 13,
+    fontWeight: '700',
   },
   backToJobs: {
     flexDirection: 'row',
