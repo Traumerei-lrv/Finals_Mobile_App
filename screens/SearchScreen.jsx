@@ -156,10 +156,10 @@ const SearchJobsScreen = ({navigation, route}) => {
       />
       {/* Top App Bar */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleOpenSidebar}>
+        <TouchableOpacity onPress={handleOpenSidebar}>  
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        <Text style={styles.logoText}>JobFinder</Text>
+        <Text style={styles.logoText}>Career Go</Text>
         <TouchableOpacity>
           <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
         </TouchableOpacity>

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   StyleSheet,
   View,
   Text,
@@ -12,7 +13,9 @@ import {
   Dimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { saveAppliedJob } from '../utils/storage';
+import { auth } from '../firebase';
+import { submitJobApplication } from '../utils/applicationsFirestore';
+import { useAuthContext } from '../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
@@ -34,22 +37,101 @@ const COLORS = {
 };
 
 const SubmitApplicationScreen = ({ navigation, route }) => {
+  const { user, userProfile } = useAuthContext();
   const job = route?.params?.job ?? null;
+  const [resume, setResume] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [formData, setFormData] = useState({
-    fullName: 'Alex Morgan',
-    email: 'alex.morgan@example.com',
-    phoneNumber: '+1 (555) 000-0000',
+    fullName: '',
+    email: '',
+    phoneNumber: '',
     screening1: '',
     noticePeriod: '',
+    resumeUrl: '',
   });
 
+  useEffect(() => {
+    const nextFullName =
+      userProfile?.fullName ||
+      user?.displayName ||
+      auth.currentUser?.displayName ||
+      '';
+    const nextEmail =
+      userProfile?.email ||
+      user?.email ||
+      auth.currentUser?.email ||
+      '';
+    const nextPhone =
+      userProfile?.phoneNumber ||
+      userProfile?.phone ||
+      '';
+
+    setFormData((prev) => ({
+      ...prev,
+      fullName: prev.fullName?.trim() ? prev.fullName : nextFullName,
+      email: prev.email?.trim() ? prev.email : nextEmail,
+      phoneNumber: prev.phoneNumber?.trim() ? prev.phoneNumber : nextPhone,
+    }));
+  }, [user?.displayName, user?.email, userProfile]);
+
+  // For link-only workflow we keep a lightweight resume state for display only
+
   const handleSubmitApplication = async () => {
+    setSubmitError('');
     if (!job) {
+      setSubmitError('Job details are missing. Please go back and open the job again.');
       return;
     }
 
-    await saveAppliedJob(job);
-    navigation.navigate('ApplicationSubmitted', { job });
+    const applicant = auth.currentUser;
+
+    if (!applicant?.uid) {
+      setSubmitError('Please sign in again before applying.');
+      return;
+    }
+
+    if (!formData.screening1.trim() || !formData.noticePeriod.trim()) {
+      setSubmitError('Please complete all required screening questions.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const resumeUrl = String(formData.resumeUrl ?? '').trim();
+      const isValidUrl = resumeUrl.length > 0 && (resumeUrl.startsWith('http://') || resumeUrl.startsWith('https://'));
+      if (!isValidUrl) {
+        setSubmitError('Please paste a valid resume link (Google Drive share link) before submitting.');
+        return;
+      }
+
+      await submitJobApplication({
+        job,
+        applicant,
+        formData: {
+          ...formData,
+          resumeUrl: resumeUrl,
+          resumePath: null,
+          resumeFileName: null,
+        },
+      });
+
+      navigation.replace('ApplicationSubmitted', { job });
+    } catch (error) {
+      console.error('Application submit failed', error);
+      const message = String(error?.message ?? '').toLowerCase();
+      if (message.includes('already applied')) {
+        navigation.replace('ApplicationSubmitted', { job });
+        return;
+      }
+      setSubmitError(
+        error?.message
+          ? `Unable to submit: ${error.message}`
+          : 'Unable to submit your application right now. Please try again.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -89,18 +171,22 @@ const SubmitApplicationScreen = ({ navigation, route }) => {
           {/* Section: Upload CV */}
           <View style={styles.sectionHeader}>
              <MaterialCommunityIcons name="file-document-outline" size={20} color={COLORS.primary} />
-             <Text style={styles.sectionTitle}>Upload CV</Text>
-          </View>
+             <Text style={styles.sectionTitle}>Upload Resume</Text>
+          </View>   
           
-          <TouchableOpacity style={styles.uploadBox}>
-            <View style={styles.pdfIconContainer}>
-               <MaterialCommunityIcons name="file-pdf-box" size={32} color={COLORS.primary} />
-            </View>
-            <Text style={styles.uploadTitle}>Upload Resume</Text>
-            <Text style={styles.uploadSubtitle}>
-              Drag and drop or click to browse (PDF, max 5MB)
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Resume Drive Link <Text style={styles.required}>*</Text></Text>
+            <TextInput
+              style={styles.input}
+              value={formData.resumeUrl}
+              placeholder="Paste Google Drive share link (https://drive.google.com/...)"
+              autoCapitalize="none"
+              onChangeText={(text) => setFormData({ ...formData, resumeUrl: text })}
+            />
+            <Text style={styles.uploadHintText}>
+              Paste a Google Drive shareable link so recruiters can view your resume.
             </Text>
-          </TouchableOpacity>
+          </View>
 
           {/* Section: Contact Information */}
           <View style={styles.sectionHeader}>
@@ -167,10 +253,15 @@ const SubmitApplicationScreen = ({ navigation, route }) => {
           </View>
 
           {/* Submit Button */}
-          <TouchableOpacity style={styles.submitButton} onPress={handleSubmitApplication}>
-            <Text style={styles.submitButtonText}>Submit Application</Text>
+          <TouchableOpacity
+            style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
+            onPress={handleSubmitApplication}
+            disabled={submitting}
+          >
+            <Text style={styles.submitButtonText}>{submitting ? 'Submitting...' : 'Submit Application'}</Text>
             <MaterialCommunityIcons name="send" size={18} color={COLORS.white} />
           </TouchableOpacity>
+          {submitError ? <Text style={styles.submitErrorText}>{submitError}</Text> : null}
 
           <Text style={styles.termsText}>
             By clicking submit, you agree to our <Text style={styles.linkText}>Terms of Service</Text> and <Text style={styles.linkText}>Privacy Policy</Text>.
@@ -178,7 +269,7 @@ const SubmitApplicationScreen = ({ navigation, route }) => {
 
           {/* Footer Branding */}
           <View style={styles.footer}>
-            <Text style={styles.footerLogo}>JobFinder</Text>
+            <Text style={styles.footerLogo}>Career Go</Text>
             <Text style={styles.footerTagline}>
               Empowering professional growth through seamless connections. Our platform ensures reliability and precision in every hire.
             </Text>
@@ -315,6 +406,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
   },
+  uploadHintText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: COLORS.secondary,
+    textAlign: 'center',
+  },
+  uploadErrorText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: COLORS.error,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   formGroup: {
     paddingHorizontal: 20,
     marginBottom: 20,
@@ -359,10 +463,43 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  uploadProgressWrap: {
+    width: '100%',
+    marginTop: 12,
+  },
+  uploadProgressTrack: {
+    width: '100%',
+    height: 8,
+    borderRadius: 8,
+    backgroundColor: COLORS.surfaceContainer,
+    overflow: 'hidden',
+  },
+  uploadProgressFill: {
+    height: '100%',
+    backgroundColor: COLORS.primary,
+    borderRadius: 8,
+  },
+  uploadProgressText: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary,
+    textAlign: 'right',
+  },
+  submitButtonDisabled: {
+    opacity: 0.7,
+  },
   submitButtonText: {
     color: COLORS.white,
     fontSize: 16,
     fontWeight: '700',
+  },
+  submitErrorText: {
+    marginTop: 10,
+    marginHorizontal: 20,
+    fontSize: 13,
+    color: COLORS.error,
+    fontWeight: '600',
   },
   termsText: {
     fontSize: 12,

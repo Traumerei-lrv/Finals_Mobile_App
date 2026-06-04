@@ -14,13 +14,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import {
-  getAppliedJobs,
-  getProfileSettings,
   getSavedJobs,
 } from '../utils/storage';
 import { buildProfileAvatarUrl } from '../utils/imageSources';
 import SidebarMenu from '../components/SidebarMenu';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
+import { subscribeToApplicantApplications } from '../utils/applicationsFirestore';
+import { useAuthContext } from '../context/AuthContext';
 
 
 const { width } = Dimensions.get('window');
@@ -42,11 +42,12 @@ const COLORS = {
 };
 
 const ProfileScreen = ({navigation}) => {
+  const { user, userProfile } = useAuthContext();
   const [profile, setProfile] = useState({
-    fullName: 'Alex Morgan',
-    headline: 'Senior Product Designer',
-    location: 'Mountain View, CA',
-    about: '',
+    fullName: 'Career Go User',
+    headline: 'Job Seeker',
+    location: 'Location not set',
+    about: 'Tell recruiters about your experience and goals.',
     skills: ['UX DESIGN', 'REACT NATIVE', 'FIGMA', 'LEADERSHIP', 'SYSTEMS THINKING'],
   });
   const [savedCount, setSavedCount] = useState(0);
@@ -59,19 +60,13 @@ const ProfileScreen = ({navigation}) => {
     let isMounted = true;
 
     const hydrate = async () => {
-      const [nextProfile, savedJobs, appliedJobs] = await Promise.all([
-        getProfileSettings(),
-        getSavedJobs(),
-        getAppliedJobs(),
-      ]);
+      const savedJobs = await getSavedJobs();
 
       if (!isMounted) {
         return;
       }
 
-      setProfile(nextProfile);
       setSavedCount(savedJobs.length);
-      setAppliedCount(appliedJobs.length);
     };
 
     void hydrate();
@@ -85,6 +80,36 @@ const ProfileScreen = ({navigation}) => {
       focusUnsubscribe();
     };
   }, [navigation]);
+
+  useEffect(() => {
+    const displayName =
+      userProfile?.fullName ||
+      user?.displayName ||
+      user?.email?.split('@')[0] ||
+      'Career Go User';
+
+    setProfile((prev) => ({
+      ...prev,
+      fullName: displayName,
+      headline: userProfile?.headline || prev.headline || 'Job Seeker',
+      location: userProfile?.location || prev.location || 'Location not set',
+      about: userProfile?.about || prev.about || 'Tell recruiters about your experience and goals.',
+      skills: Array.isArray(userProfile?.skills) && userProfile.skills.length
+        ? userProfile.skills
+        : prev.skills,
+    }));
+  }, [user?.displayName, user?.email, userProfile]);
+
+  useEffect(() => {
+    const applicantId = auth.currentUser?.uid ?? null;
+    const unsubscribe = subscribeToApplicantApplications({
+      applicantId,
+      onData: (applications) => setAppliedCount(applications.length),
+      onError: (error) => console.error('Profile applications subscription error', error),
+    });
+
+    return unsubscribe;
+  }, []);
 
   const avatarSource = useMemo(
     () => ({ uri: buildProfileAvatarUrl(profile.fullName || 'Career Go User') }),
@@ -124,7 +149,7 @@ const ProfileScreen = ({navigation}) => {
         <TouchableOpacity onPress={handleOpenSidebar}>
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        <Text style={styles.logoText}>JobFinder</Text>
+        <Text style={styles.logoText}>Career Go</Text>
         <TouchableOpacity>
           <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
         </TouchableOpacity>

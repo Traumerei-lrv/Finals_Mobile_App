@@ -85,7 +85,7 @@ export default function EditProfileScreen({ navigation }) {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.avatarBlock}>
-          <Image source={{ uri: buildProfileAvatarUrl(form.fullName || 'JobFinder User') }} style={styles.avatar} />
+          <Image source={{ uri: buildProfileAvatarUrl(form.fullName || 'Career Go User') }} style={styles.avatar} />
           <Text style={styles.avatarCaption}>Profile image from DiceBear</Text>
         </View>
 

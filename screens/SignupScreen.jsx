@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 // Design Tokens (Professional Velocity)
 const COLORS = {
@@ -32,6 +33,8 @@ const COLORS = {
 const ReactNativeSignUp = ({navigation}) => {
   const [role, setRole] = useState('seeker'); // 'seeker' or 'recruiter'
   const [fullName, setFullName] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [contactPerson, setContactPerson] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -42,7 +45,10 @@ const ReactNativeSignUp = ({navigation}) => {
   const handleCreateAccount = async () => {
     setError('');
 
-    if (!fullName || !email || !password) {
+    const isRecruiter = role === 'recruiter';
+    const effectiveName = isRecruiter ? contactPerson.trim() : fullName.trim();
+
+    if ((!isRecruiter && !fullName.trim()) || !email || !password || (isRecruiter && !companyName.trim()) || (isRecruiter && !contactPerson.trim())) {
       setError('Please complete all fields.');
       return;
     }
@@ -59,7 +65,41 @@ const ReactNativeSignUp = ({navigation}) => {
 
     setLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const selectedRole = role === 'recruiter' ? 'recruiter' : 'job_seeker';
+
+      // Ensure users/{uid} document exists so client role reads succeed immediately
+      try {
+        const uid = userCredential.user?.uid ?? auth.currentUser?.uid;
+        if (uid) {
+          await setDoc(doc(db, 'users', uid), {
+            fullName: effectiveName,
+            email: email.trim().toLowerCase(),
+            role: selectedRole,
+            createdAt: serverTimestamp(),
+          }, { merge: true });
+          
+          // If this is a recruiter, create a recruiters/{uid} profile doc too
+          if (selectedRole === 'recruiter') {
+            try {
+              await setDoc(doc(db, 'recruiters', uid), {
+                fullName: effectiveName,
+                email: email.trim().toLowerCase(),
+                company: companyName.trim(),
+                verified: false,
+                contactPerson: contactPerson.trim(),
+                createdAt: serverTimestamp(),
+              }, { merge: true });
+            } catch (recErr) {
+              console.error('Failed to write recruiters document after signup', recErr);
+            }
+          }
+        }
+      } catch (writeErr) {
+        console.error('Failed to write users document after signup', writeErr);
+      }
+
+      // After sign-up, the auth state listener in App.tsx will route by role.
     } catch (e) {
       console.error('SignUp error', e);
 
@@ -132,22 +172,47 @@ const ReactNativeSignUp = ({navigation}) => {
             </View>
 
             {/* Input Fields */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Full Name</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Alex Morgan"
-                placeholderTextColor={COLORS.secondary}
-                value={fullName}
-                onChangeText={setFullName}
-              />
-            </View>
+            {role === 'recruiter' ? (
+              <>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Company Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. CloudBridge Tech"
+                    placeholderTextColor={COLORS.secondary}
+                    value={companyName}
+                    onChangeText={setCompanyName}
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Contact Person</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. Alex Morgan"
+                    placeholderTextColor={COLORS.secondary}
+                    value={contactPerson}
+                    onChangeText={setContactPerson}
+                  />
+                </View>
+              </>
+            ) : (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Full Name</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. Alex Morgan"
+                  placeholderTextColor={COLORS.secondary}
+                  value={fullName}
+                  onChangeText={setFullName}
+                />
+              </View>
+            )}
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email Address</Text>
+              <Text style={styles.label}>{role === 'recruiter' ? 'Company Email Address' : 'Email Address'}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="alex.morgan@example.com"
+                placeholder={role === 'recruiter' ? 'hiring@company.com' : 'alex.morgan@example.com'}
                 placeholderTextColor={COLORS.secondary}
                 value={email}
                 onChangeText={setEmail}
