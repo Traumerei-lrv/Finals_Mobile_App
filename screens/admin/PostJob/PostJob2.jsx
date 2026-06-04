@@ -92,9 +92,9 @@ const PostJobStep2Screen = ({ navigation, route }) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <View style={styles.profileAvatarPlaceholder}>
-            <MaterialCommunityIcons name="account" size={24} color={COLORS.primary} />
-          </View>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={COLORS.primary} />
+          </TouchableOpacity>
           <Text style={styles.headerLogo}>Career Go</Text>
         </View>
         <TouchableOpacity>
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.outline, backgroundColor: COLORS.white,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  profileAvatarPlaceholder: {
+  backButton: {
     width: 36, height: 36, borderRadius: 8, backgroundColor: COLORS.surfaceContainerLow,
     justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.outline,
   },

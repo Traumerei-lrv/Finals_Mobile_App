@@ -46,14 +46,31 @@ const PostJobScreen = ({ navigation }) => {
     description: '',
   });
 
+  const draftPayload = {
+    role: formData.jobTitle.trim() || 'Untitled Role',
+    company: formData.companyName.trim() || 'Velocity Corp',
+    location: formData.location.trim() || 'Remote',
+    type: workMode,
+    salary:
+      formData.minSalary.trim() && formData.maxSalary.trim()
+        ? `$${formData.minSalary.trim()} - $${formData.maxSalary.trim()}`
+        : formData.minSalary.trim()
+          ? `$${formData.minSalary.trim()}+`
+          : formData.maxSalary.trim()
+            ? `Up to $${formData.maxSalary.trim()}`
+            : 'Competitive',
+    about: formData.description.trim(),
+    industry: formData.industry.trim(),
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Top App Bar */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <View style={styles.profileAvatarPlaceholder}>
-            <MaterialCommunityIcons name="account" size={24} color={COLORS.primary} />
-          </View>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={COLORS.primary} />
+          </TouchableOpacity>
           <Text style={styles.headerLogo}>Recruiter Hub</Text>
         </View>
         <TouchableOpacity>
@@ -212,7 +229,10 @@ const PostJobScreen = ({ navigation }) => {
           </View>
 
           {/* Bottom Action */}
-          <TouchableOpacity style={styles.continueButton}>
+          <TouchableOpacity
+            style={styles.continueButton}
+            onPress={() => navigation.navigate('PostJobStep2', { draft: draftPayload })}
+          >
             <Text style={styles.continueButtonText}>Continue to Step 2</Text>
             <MaterialCommunityIcons name="arrow-right" size={20} color={COLORS.white} />
           </TouchableOpacity>
@@ -255,7 +275,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  profileAvatarPlaceholder: {
+  backButton: {
     width: 36,
     height: 36,
     borderRadius: 8,
