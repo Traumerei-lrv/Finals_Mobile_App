@@ -9,22 +9,23 @@ const COLORS = {
 };
 
 const MENU_ITEMS = [
-  { key: 'home', route: 'Home', label: 'Home', icon: 'home-outline' },
-  { key: 'search', route: 'Search', label: 'Search', icon: 'magnify' },
+  { key: 'home', route: 'JobSeekerDashboard', params: { tab: 'home' }, label: 'Home', icon: 'home-outline' },
+  { key: 'search', route: 'JobSeekerDashboard', params: { tab: 'search' }, label: 'Search', icon: 'magnify' },
   { key: 'saved', route: 'Saved', label: 'Saved Jobs', icon: 'bookmark-outline' },
-  { key: 'application', route: 'Application', label: 'Applications', icon: 'file-document-outline' },
-  { key: 'profile', route: 'Profile', label: 'Profile', icon: 'account-outline' },
+  { key: 'applications', route: 'JobSeekerDashboard', params: { tab: 'applications' }, label: 'Applications', icon: 'file-document-outline' },
+  { key: 'profile', route: 'JobSeekerDashboard', params: { tab: 'profile' }, label: 'Profile', icon: 'account-outline' },
 ];
 
 export default function SidebarMenu({ isOpen, onClose, navigation, activeRoute, onItemPress }) {
   const handlePress = (item) => {
     if (typeof onItemPress === 'function') {
       onItemPress(item);
-      return;
+    } else if (navigation?.navigate && item.route) {
+      navigation.navigate(item.route, item.params);
     }
 
-    if (navigation?.navigate && item.route) {
-      navigation.navigate(item.route);
+    if (typeof onClose === 'function') {
+      onClose();
     }
   };
 
@@ -42,7 +43,7 @@ export default function SidebarMenu({ isOpen, onClose, navigation, activeRoute, 
         {MENU_ITEMS.map((item) => (
           <TouchableOpacity
             key={item.key}
-            style={[styles.sidebarItem, activeRoute === item.route && styles.sidebarItemActive]}
+            style={[styles.sidebarItem, (activeRoute === item.route || activeRoute === item.key) && styles.sidebarItemActive]}
             onPress={() => handlePress(item)}
           >
             <MaterialCommunityIcons name={item.icon} size={20} color={COLORS.primary} />

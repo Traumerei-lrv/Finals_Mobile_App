@@ -33,7 +33,10 @@ export default function ApplicationSubmittedScreen({ navigation, route }) {
           <Text style={styles.primaryButtonText}>Track Application</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('Application')}>
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={() => navigation.navigate('JobSeekerDashboard', { tab: 'applications' })}
+        >
           <Text style={styles.secondaryButtonText}>Go To Applied Jobs</Text>
         </TouchableOpacity>
       </View>

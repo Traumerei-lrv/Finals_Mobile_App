@@ -1,6 +1,7 @@
 import React from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const COLORS = {
   primary: '#1a365d',
@@ -10,61 +11,81 @@ const COLORS = {
   accentBlue: '#8AB4F8',
 };
 
-const RecruiterBottomNav = ({ navigation, activeTab = 'home', showFab = true }) => {
-  const goHome = () => navigation.navigate('RecruiterHome');
-  const goPostJob = () => navigation.navigate('PostJob');
-  const goApplicants = () => navigation.navigate('ApplicantsList');
-  const goProfile = () => navigation.navigate('RecruiterProfile');
+export const RECRUITER_BOTTOM_NAV_BASE_HEIGHT = 92;
+
+const NAV_ITEMS = [
+  {
+    key: 'home',
+    route: 'RecruiterDashboard',
+    params: { tab: 'home' },
+    icon: 'home',
+    label: 'Home',
+  },
+  {
+    key: 'post_job',
+    route: 'RecruiterDashboard',
+    params: { tab: 'post_job' },
+    icon: 'plus-box-outline',
+    label: 'Post Job',
+  },
+  {
+    key: 'applicants',
+    route: 'RecruiterDashboard',
+    params: { tab: 'applicants' },
+    icon: 'file-document-outline',
+    label: 'Applicants',
+  },
+  {
+    key: 'profile',
+    route: 'RecruiterDashboard',
+    params: { tab: 'profile' },
+    icon: 'account-outline',
+    label: 'Profile',
+  },
+];
+
+const RecruiterBottomNav = ({ navigation, activeTab = 'home', showFab = true, onTabPress }) => {
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 12);
+  const navHeight = RECRUITER_BOTTOM_NAV_BASE_HEIGHT + bottomPadding;
+
+  const handlePress = (item) => {
+    if (typeof onTabPress === 'function') {
+      onTabPress(item.key);
+      return;
+    }
+
+    navigation.navigate(item.route, item.params);
+  };
 
   return (
     <>
       {showFab ? (
-        <TouchableOpacity style={styles.fab} onPress={goPostJob}>
+        <TouchableOpacity
+          style={[styles.fab, { bottom: navHeight + 18 }]}
+          onPress={() => handlePress(NAV_ITEMS[1])}
+        >
           <MaterialCommunityIcons name="plus" size={32} color={COLORS.white} />
         </TouchableOpacity>
       ) : null}
 
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={goHome}>
-          <View style={activeTab === 'home' ? styles.activeNavIndicator : undefined}>
-            <MaterialCommunityIcons
-              name="home"
-              size={24}
-              color={activeTab === 'home' ? COLORS.primary : COLORS.secondary}
-            />
-            <Text style={activeTab === 'home' ? styles.navLabelActive : styles.navLabel}>Home</Text>
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={goPostJob}>
-          <View style={activeTab === 'post_job' ? styles.activeNavIndicator : undefined}>
-            <MaterialCommunityIcons
-              name="plus-box-outline"
-              size={24}
-              color={activeTab === 'post_job' ? COLORS.primary : COLORS.secondary}
-            />
-            <Text style={activeTab === 'post_job' ? styles.navLabelActive : styles.navLabel}>Post Job</Text>
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={goApplicants}>
-          <View style={activeTab === 'applicants' ? styles.activeNavIndicator : undefined}>
-            <MaterialCommunityIcons
-              name="file-document-outline"
-              size={24}
-              color={activeTab === 'applicants' ? COLORS.primary : COLORS.secondary}
-            />
-            <Text style={activeTab === 'applicants' ? styles.navLabelActive : styles.navLabel}>Applicants</Text>
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={goProfile}>
-          <View style={activeTab === 'profile' ? styles.activeNavIndicator : undefined}>
-            <MaterialCommunityIcons
-              name="account-outline"
-              size={24}
-              color={activeTab === 'profile' ? COLORS.primary : COLORS.secondary}
-            />
-            <Text style={activeTab === 'profile' ? styles.navLabelActive : styles.navLabel}>Profile</Text>
-          </View>
-        </TouchableOpacity>
+      <View style={[styles.bottomNav, { paddingBottom: bottomPadding, minHeight: navHeight }]}>
+        {NAV_ITEMS.map((item) => {
+          const isActive = activeTab === item.key;
+
+          return (
+            <TouchableOpacity key={item.key} style={styles.navItem} onPress={() => handlePress(item)}>
+              <View style={isActive ? styles.activeNavIndicator : undefined}>
+                <MaterialCommunityIcons
+                  name={item.icon}
+                  size={24}
+                  color={isActive ? COLORS.primary : COLORS.secondary}
+                />
+                <Text style={isActive ? styles.navLabelActive : styles.navLabel}>{item.label}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </>
   );
@@ -73,7 +94,6 @@ const RecruiterBottomNav = ({ navigation, activeTab = 'home', showFab = true }) 
 const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
-    bottom: 100,
     right: 20,
     width: 56,
     height: 56,
@@ -88,19 +108,18 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   bottomNav: {
-    position: 'absolute',
-    bottom: 0,
     width: '100%',
     flexDirection: 'row',
     backgroundColor: COLORS.white,
     paddingTop: 10,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+    paddingHorizontal: 6,
     borderTopWidth: 1,
     borderTopColor: COLORS.outline,
   },
   navItem: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
   },
   activeNavIndicator: {

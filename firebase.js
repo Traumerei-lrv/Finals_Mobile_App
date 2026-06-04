@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const FIREBASE_API_KEY = 'AIzaSyD0i3TfA1QTL_h1GpZeI67tt8H3vrbDiL8'.trim();
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: FIREBASE_API_KEY,
   authDomain: "realtime-database-cd1d6.firebaseapp.com",
   databaseURL: "https://realtime-database-cd1d6-default-rtdb.asia-southeast1.firebasedatabase.app",
