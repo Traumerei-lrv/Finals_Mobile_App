@@ -56,21 +56,38 @@ exports.adminCreateUser = functions.https.onCall(async (data, context) => {
   }
 
   try {
-    const userRecord = await admin.auth().createUser({ email, password, displayName });
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const normalizedName = displayName ? String(displayName).trim() : '';
+    const userRecord = await admin.auth().createUser({
+      email: normalizedEmail,
+      password,
+      displayName: normalizedName || undefined,
+    });
     await admin.auth().setCustomUserClaims(userRecord.uid, { role });
     await admin.firestore().collection('users').doc(userRecord.uid).set({
-      email,
-      displayName: displayName || null,
+      email: normalizedEmail,
+      displayName: normalizedName || null,
+      fullName: normalizedName || null,
       role,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       active: true,
     }, { merge: true });
 
+    if (role === 'recruiter') {
+      await admin.firestore().collection('recruiters').doc(userRecord.uid).set({
+        email: normalizedEmail,
+        fullName: normalizedName || null,
+        contactPerson: normalizedName || null,
+        verified: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
+
     await admin.firestore().collection('admin_logs').add({
       action: 'createUser',
       actor: context.auth.uid,
       targetUid: userRecord.uid,
-      payload: { email, role },
+      payload: { email: normalizedEmail, role },
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -93,6 +110,9 @@ exports.adminSetDisabled = functions.https.onCall(async (data, context) => {
   const { uid, disabled } = data || {};
   if (!uid || typeof disabled !== 'boolean') {
     throw new functions.https.HttpsError('invalid-argument', 'Must provide uid and disabled boolean');
+  }
+  if (uid === context.auth.uid) {
+    throw new functions.https.HttpsError('failed-precondition', 'Admins cannot change the active state of their own account.');
   }
 
   try {
@@ -126,6 +146,9 @@ exports.adminDeleteUser = functions.https.onCall(async (data, context) => {
   const { uid, soft = true } = data || {};
   if (!uid) {
     throw new functions.https.HttpsError('invalid-argument', 'Must provide uid');
+  }
+  if (uid === context.auth.uid) {
+    throw new functions.https.HttpsError('failed-precondition', 'Admins cannot delete their own account.');
   }
 
   try {

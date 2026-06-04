@@ -1,8 +1,10 @@
+import 'expo-dev-client';
 import React, { useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -11,40 +13,38 @@ import {
   getStoredAuthUser,
   saveStoredAuthUser,
 } from './utils/storage';
-import LoginScreen from './screens/job_Seeker/LoginScreen';
-import RecruiterHome from './screens/admin/RecruiterHome';
-import PostJobScreen from './screens/admin/PostJob/PostJob';
-import PostJobStep2Screen from './screens/admin/PostJob/PostJob2';
-import PostJobStep3Screen from './screens/admin/PostJob/PostJob3';
-import JobPostingSuccessScreen from './screens/admin/PostJob/PostJobSuccess';
-import ApplicantsListScreen from './screens/admin/ApplicantsList';
-import ArchivedApplicationsScreen from './screens/admin/ArchivedApplications';
-import RecruiterProfileScreen from './screens/admin/RecruiterProfile';
-import ApplicantReviewScreen from './screens/admin/ApplicantReview';
-import InterviewScheduleScreen from './screens/admin/InterviewSchedule';
-import EditRecruiterProfileScreen from './screens/admin/EditRecruiterProfile';
-import AdminDashboard from './screens/admin/AdminDashboard';
-import AdminJobs from './screens/admin/AdminJobs';
-import AdminApplicants from './screens/admin/AdminApplicants';
-import AdminUsers from './screens/admin/AdminUsers';
-import AdminReports from './screens/admin/AdminReports';
-import AuditLogs from './screens/admin/AuditLogs';
-import HomeScreen from './screens/HomeScreen';
-import SignupScreen from './screens/SignupScreen';
-import ProfileScreen from './screens/Profile';
-import ApplicationScreen from './screens/ApplicationScreen';
-import SearchScreen from './screens/SearchScreen';
-import SavedJobsScreen from './screens/SavedJobsScreen';
-import JobDetailsScreen from './screens/JobDetailsScreen';
-import SubmitApplicationScreen from './screens/SubmitApplication';
-import ApplicationSubmittedScreen from './screens/ApplicationSubmitted';
-import TrackApplicationScreen from './screens/TrackApplication';
-import EditProfileScreen from './screens/EditProfileScreen';
-import ResumeSettingsScreen from './screens/ResumeSettings';
-import PrivacySettingsScreen from './screens/PrivacySettingsScreen';
 import { AuthProvider } from './context/AuthContext';
 
 const Stack = createNativeStackNavigator();
+const getAdminDashboard = () => require('./screens/admin/AdminDashboard').default;
+const getAdminJobs = () => require('./screens/admin/AdminJobs').default;
+const getAdminApplicants = () => require('./screens/admin/AdminApplicants').default;
+const getAdminUsers = () => require('./screens/admin/AdminUsers').default;
+const getAdminReports = () => require('./screens/admin/AdminReports').default;
+const getAuditLogs = () => require('./screens/admin/AuditLogs').default;
+const getAdminProfile = () => require('./screens/admin/AdminProfile').default;
+const getRecruiterDashboard = () => require('./screens/admin/RecruiterDashboard').default;
+const getPostJob = () => require('./screens/admin/PostJob/PostJob').default;
+const getPostJobStep2 = () => require('./screens/admin/PostJob/PostJob2').default;
+const getPostJobStep3 = () => require('./screens/admin/PostJob/PostJob3').default;
+const getPostJobSuccess = () => require('./screens/admin/PostJob/PostJobSuccess').default;
+const getApplicantsList = () => require('./screens/admin/RecruiterDashboard').default;
+const getArchivedApplications = () => require('./screens/admin/ArchivedApplications').default;
+const getApplicantReview = () => require('./screens/admin/ApplicantReview').default;
+const getInterviewSchedule = () => require('./screens/admin/InterviewSchedule').default;
+const getRecruiterProfile = () => require('./screens/admin/RecruiterDashboard').default;
+const getEditRecruiterProfile = () => require('./screens/admin/EditRecruiterProfile').default;
+const getJobSeekerDashboard = () => require('./screens/JobSeekerDashboard').default;
+const getSavedJobsScreen = () => require('./screens/SavedJobsScreen').default;
+const getJobDetailsScreen = () => require('./screens/JobDetailsScreen').default;
+const getSubmitApplicationScreen = () => require('./screens/SubmitApplication').default;
+const getApplicationSubmittedScreen = () => require('./screens/ApplicationSubmitted').default;
+const getTrackApplicationScreen = () => require('./screens/TrackApplication').default;
+const getEditProfileScreen = () => require('./screens/EditProfileScreen').default;
+const getResumeSettingsScreen = () => require('./screens/ResumeSettings').default;
+const getPrivacySettingsScreen = () => require('./screens/PrivacySettingsScreen').default;
+const getLoginScreen = () => require('./screens/job_Seeker/LoginScreen').default;
+const getSignupScreen = () => require('./screens/SignupScreen').default;
 
 const normalizeRole = (value: unknown) => {
   if (typeof value !== 'string') {
@@ -84,6 +84,11 @@ export default function App() {
           const userRef = doc(db, 'users', u.uid);
           const userSnap = await getDoc(userRef);
           const userData = userSnap.exists() ? userSnap.data() : null;
+          if (userData?.active === false) {
+            await signOut(auth);
+            setRole(null);
+            return;
+          }
           const remoteRole =
             normalizeRole(userData?.role) ??
             normalizeRole(userData?.userRole) ??
@@ -188,73 +193,79 @@ export default function App() {
   }
 
   return (
-    <AuthProvider user={user} role={role}>
-      <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {user ? (
-            // Route based on role claim: 'admin' or 'recruiter' -> recruiter/admin area; otherwise Job Seeker flows
-            <>
-              {role === 'admin' ? (
-                <>
-                  <Stack.Screen name="AdminDashboard" component={AdminDashboard as React.ComponentType<any>} />
-                  <Stack.Screen name="AdminJobs" component={AdminJobs as React.ComponentType<any>} />
-                  <Stack.Screen name="AdminApplicants" component={AdminApplicants as React.ComponentType<any>} />
-                  <Stack.Screen name="AdminUsers" component={AdminUsers as React.ComponentType<any>} />
-                  <Stack.Screen name="AdminReports" component={AdminReports as React.ComponentType<any>} />
-                  <Stack.Screen name="AuditLogs" component={AuditLogs as React.ComponentType<any>} />
-                  <Stack.Screen name="RecruiterHome" component={RecruiterHome as React.ComponentType<any>} />
-                  <Stack.Screen name="PostJob" component={PostJobScreen as React.ComponentType<any>} />
-                  <Stack.Screen name="PostJobStep2" component={PostJobStep2Screen as React.ComponentType<any>} />
-                  <Stack.Screen name="PostJobStep3" component={PostJobStep3Screen as React.ComponentType<any>} />
-                  <Stack.Screen name="PostJobSuccess" component={JobPostingSuccessScreen as React.ComponentType<any>} />
-                  <Stack.Screen name="ApplicantsList" component={ApplicantsListScreen as React.ComponentType<any>} />
-                  <Stack.Screen name="ArchivedApplications" component={ArchivedApplicationsScreen as React.ComponentType<any>} />
-                  <Stack.Screen name="ApplicantReview" component={ApplicantReviewScreen as React.ComponentType<any>} />
-                  <Stack.Screen name="InterviewSchedule" component={InterviewScheduleScreen as React.ComponentType<any>} />
-                  <Stack.Screen name="RecruiterProfile" component={RecruiterProfileScreen as React.ComponentType<any>} />
-                  <Stack.Screen name="EditRecruiterProfile" component={EditRecruiterProfileScreen as React.ComponentType<any>} />
-                </>
-              ) : role === 'recruiter' ? (
-                <>
-                  <Stack.Screen name="RecruiterHome" component={RecruiterHome as React.ComponentType<any>} />
-                  <Stack.Screen name="PostJob" component={PostJobScreen as React.ComponentType<any>} />
-                  <Stack.Screen name="PostJobStep2" component={PostJobStep2Screen as React.ComponentType<any>} />
-                  <Stack.Screen name="PostJobStep3" component={PostJobStep3Screen as React.ComponentType<any>} />
-                  <Stack.Screen name="PostJobSuccess" component={JobPostingSuccessScreen as React.ComponentType<any>} />
-                  <Stack.Screen name="ApplicantsList" component={ApplicantsListScreen as React.ComponentType<any>} />
-                  <Stack.Screen name="ArchivedApplications" component={ArchivedApplicationsScreen as React.ComponentType<any>} />
-                  <Stack.Screen name="ApplicantReview" component={ApplicantReviewScreen as React.ComponentType<any>} />
-                  <Stack.Screen name="InterviewSchedule" component={InterviewScheduleScreen as React.ComponentType<any>} />
-                  <Stack.Screen name="RecruiterProfile" component={RecruiterProfileScreen as React.ComponentType<any>} />
-                  <Stack.Screen name="EditRecruiterProfile" component={EditRecruiterProfileScreen as React.ComponentType<any>} />
-                </>
-              ) : (
-                <>
-                  <Stack.Screen name="Home" component={HomeScreen} />
-              <Stack.Screen name="Search" component={SearchScreen} />
-              <Stack.Screen name="Saved" component={SavedJobsScreen} />
-              <Stack.Screen name="Application" component={ApplicationScreen} />
-              <Stack.Screen name="Profile" component={ProfileScreen} />
-              <Stack.Screen name="JobDetails" component={JobDetailsScreen} />
-              <Stack.Screen name="SubmitApplication" component={SubmitApplicationScreen} />
-              <Stack.Screen name="ApplicationSubmitted" component={ApplicationSubmittedScreen} />
-              <Stack.Screen name="TrackApplication" component={TrackApplicationScreen} />
-              <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-              <Stack.Screen name="ResumeSettings" component={ResumeSettingsScreen} />
-              <Stack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              <Stack.Screen name="Login" component={LoginScreen} />
-              <Stack.Screen name="SignUp" component={SignupScreen} />
-            </>
-          )}
-        </Stack.Navigator>
-        <StatusBar style="auto" />
-      </NavigationContainer>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider user={user} role={role}>
+        <NavigationContainer>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            {user ? (
+              // Route based on role claim: 'admin' or 'recruiter' -> recruiter/admin area; otherwise Job Seeker flows
+              <>
+                {role === 'admin' ? (
+                  <>
+                    <Stack.Screen name="AdminDashboard" getComponent={getAdminDashboard} />
+                    <Stack.Screen name="AdminJobs" getComponent={getAdminJobs} />
+                    <Stack.Screen name="AdminApplicants" getComponent={getAdminApplicants} />
+                    <Stack.Screen name="AdminUsers" getComponent={getAdminUsers} />
+                    <Stack.Screen name="AdminReports" getComponent={getAdminReports} />
+                    <Stack.Screen name="AuditLogs" getComponent={getAuditLogs} />
+                    <Stack.Screen name="AdminProfile" getComponent={getAdminProfile} />
+                    <Stack.Screen name="RecruiterDashboard" getComponent={getRecruiterDashboard} />
+                    <Stack.Screen name="RecruiterHome" getComponent={getRecruiterDashboard} />
+                    <Stack.Screen name="PostJob" getComponent={getRecruiterDashboard} />
+                    <Stack.Screen name="PostJobStep2" getComponent={getPostJobStep2} />
+                    <Stack.Screen name="PostJobStep3" getComponent={getPostJobStep3} />
+                    <Stack.Screen name="PostJobSuccess" getComponent={getPostJobSuccess} />
+                    <Stack.Screen name="ApplicantsList" getComponent={getApplicantsList} />
+                    <Stack.Screen name="ArchivedApplications" getComponent={getArchivedApplications} />
+                    <Stack.Screen name="ApplicantReview" getComponent={getApplicantReview} />
+                    <Stack.Screen name="InterviewSchedule" getComponent={getInterviewSchedule} />
+                    <Stack.Screen name="RecruiterProfile" getComponent={getRecruiterProfile} />
+                    <Stack.Screen name="EditRecruiterProfile" getComponent={getEditRecruiterProfile} />
+                  </>
+                ) : role === 'recruiter' ? (
+                  <>
+                    <Stack.Screen name="RecruiterDashboard" getComponent={getRecruiterDashboard} />
+                    <Stack.Screen name="RecruiterHome" getComponent={getRecruiterDashboard} />
+                    <Stack.Screen name="PostJob" getComponent={getRecruiterDashboard} />
+                    <Stack.Screen name="PostJobStep2" getComponent={getPostJobStep2} />
+                    <Stack.Screen name="PostJobStep3" getComponent={getPostJobStep3} />
+                    <Stack.Screen name="PostJobSuccess" getComponent={getPostJobSuccess} />
+                    <Stack.Screen name="ApplicantsList" getComponent={getApplicantsList} />
+                    <Stack.Screen name="ArchivedApplications" getComponent={getArchivedApplications} />
+                    <Stack.Screen name="ApplicantReview" getComponent={getApplicantReview} />
+                    <Stack.Screen name="InterviewSchedule" getComponent={getInterviewSchedule} />
+                    <Stack.Screen name="RecruiterProfile" getComponent={getRecruiterProfile} />
+                    <Stack.Screen name="EditRecruiterProfile" getComponent={getEditRecruiterProfile} />
+                  </>
+                ) : (
+                  <>
+                    <Stack.Screen name="JobSeekerDashboard" getComponent={getJobSeekerDashboard} />
+                    <Stack.Screen name="Home" getComponent={getJobSeekerDashboard} />
+                    <Stack.Screen name="Search" getComponent={getJobSeekerDashboard} />
+                    <Stack.Screen name="Application" getComponent={getJobSeekerDashboard} />
+                    <Stack.Screen name="Profile" getComponent={getJobSeekerDashboard} />
+                    <Stack.Screen name="Saved" getComponent={getSavedJobsScreen} />
+                    <Stack.Screen name="JobDetails" getComponent={getJobDetailsScreen} />
+                    <Stack.Screen name="SubmitApplication" getComponent={getSubmitApplicationScreen} />
+                    <Stack.Screen name="ApplicationSubmitted" getComponent={getApplicationSubmittedScreen} />
+                    <Stack.Screen name="TrackApplication" getComponent={getTrackApplicationScreen} />
+                    <Stack.Screen name="EditProfile" getComponent={getEditProfileScreen} />
+                    <Stack.Screen name="ResumeSettings" getComponent={getResumeSettingsScreen} />
+                    <Stack.Screen name="PrivacySettings" getComponent={getPrivacySettingsScreen} />
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <Stack.Screen name="Login" getComponent={getLoginScreen} />
+                <Stack.Screen name="SignUp" getComponent={getSignupScreen} />
+              </>
+            )}
+          </Stack.Navigator>
+          <StatusBar style="auto" />
+        </NavigationContainer>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 

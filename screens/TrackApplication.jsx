@@ -5,12 +5,12 @@ import {
   View,
   Text,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   Image,
   Dimensions,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import BottomNav from '../components/BottomNav';
 import { withdrawApplicationForApplicant } from '../utils/applicationsFirestore';
@@ -66,7 +66,7 @@ const TrackApplicationScreen = ({ navigation, route }) => {
 
     try {
       await withdrawApplicationForApplicant({ applicationId });
-      navigation.navigate('Application', { initialTab: 'Archive' });
+      navigation.navigate('JobSeekerDashboard', { tab: 'applications', applicationTab: 'Archive' });
     } catch (error) {
       console.error('Withdraw application failed', error);
       Alert.alert('Withdraw failed', 'Unable to withdraw this application right now. Please try again.');
@@ -230,7 +230,7 @@ const TrackApplicationScreen = ({ navigation, route }) => {
         </View>
       </ScrollView>
 
-      <BottomNav navigation={navigation} activeRoute="Application" />
+      <BottomNav navigation={navigation} activeRoute="applications" />
     </SafeAreaView>
   );
 };

@@ -5,13 +5,13 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   Image,
   Dimensions,
   Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   getSavedJobs,
   removeSavedJob,
@@ -42,6 +42,7 @@ const COLORS = {
 };
 
 const JobSeekerHome = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   const [savedJobs, setSavedJobs] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -122,7 +123,7 @@ const JobSeekerHome = ({ navigation }) => {
       />
 
       {/* Top App Bar */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 10) + 2 }]}>
         <TouchableOpacity onPress={handleOpenSidebar}>
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
@@ -132,7 +133,10 @@ const JobSeekerHome = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 128 + insets.bottom }]}
+      >
         {/* Search Bar */}
         <View style={styles.searchContainer}>
           <View style={styles.searchInputWrapper}>
@@ -269,12 +273,12 @@ const JobSeekerHome = ({ navigation }) => {
       </ScrollView>
 
       {/* Floating Action Button */}
-      <TouchableOpacity style={styles.fab}>
+      <TouchableOpacity style={[styles.fab, { bottom: 96 + insets.bottom }]}>
         <MaterialCommunityIcons name="pencil-outline" size={24} color={COLORS.white} />
       </TouchableOpacity>
 
       {/* Bottom Nav Bar */}
-      <View style={styles.bottomNav}>
+      <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 12), minHeight: 82 + insets.bottom }]}>
         <TouchableOpacity style={styles.navItemActive} onPress={() => navigation.navigate('Home')}>
           <MaterialCommunityIcons name="home" size={24} color={COLORS.onSecondaryContainer} />
           <Text style={styles.navLabelActive}>Home</Text>
@@ -309,6 +313,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.outline,
+    backgroundColor: COLORS.surface,
   },
   logoText: {
     fontSize: 20,
@@ -317,7 +322,7 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Hanken Grotesk' : 'sans-serif',
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 128,
   },
   searchContainer: {
     padding: 20,
@@ -673,7 +678,7 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    bottom: 90,
+    bottom: 96,
     right: 20,
     width: 56,
     height: 56,
@@ -694,7 +699,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: COLORS.white,
     paddingTop: 10,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+    paddingBottom: 12,
     borderTopWidth: 1,
     borderTopColor: COLORS.outline,
   },

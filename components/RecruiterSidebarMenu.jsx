@@ -9,21 +9,22 @@ const COLORS = {
 };
 
 const MENU_ITEMS_BASE = [
+  { key: 'home', route: 'RecruiterDashboard', params: { tab: 'home' }, label: 'Dashboard', icon: 'view-dashboard-outline' },
+  { key: 'post_job', route: 'RecruiterDashboard', params: { tab: 'post_job' }, label: 'Post Job', icon: 'plus-box-outline' },
+  { key: 'applicants', route: 'RecruiterDashboard', params: { tab: 'applicants' }, label: 'Applicants', icon: 'account-group-outline' },
+  { key: 'profile', route: 'RecruiterDashboard', params: { tab: 'profile' }, label: 'Profile', icon: 'account-outline' },
   { key: 'archived', route: 'ArchivedApplications', label: 'Archived', icon: 'archive-outline' },
 ];
 
 const ADMIN_ITEM = { key: 'admin', route: 'AdminDashboard', label: 'Admin', icon: 'shield-account-outline' };
 
 export default function RecruiterSidebarMenu({ isOpen, onClose, navigation, activeRoute, onItemPress, showAdmin = false }) {
-  const MENU_ITEMS = showAdmin ? [ADMIN_ITEM, ...MENU_ITEMS_BASE] : MENU_ITEMS_BASE;
+  const MENU_ITEMS = showAdmin ? [...MENU_ITEMS_BASE, ADMIN_ITEM] : MENU_ITEMS_BASE;
   const handlePress = (item) => {
     if (typeof onItemPress === 'function') {
       onItemPress(item);
-      return;
-    }
-
-    if (navigation?.navigate && item.route) {
-      navigation.navigate(item.route);
+    } else if (navigation?.navigate && item.route) {
+      navigation.navigate(item.route, item.params);
     }
 
     if (typeof onClose === 'function') {
@@ -45,7 +46,7 @@ export default function RecruiterSidebarMenu({ isOpen, onClose, navigation, acti
         {MENU_ITEMS.map((item) => (
           <TouchableOpacity
             key={item.key}
-            style={[styles.sidebarItem, activeRoute === item.route && styles.sidebarItemActive]}
+            style={[styles.sidebarItem, (activeRoute === item.route || activeRoute === item.key) && styles.sidebarItemActive]}
             onPress={() => handlePress(item)}
           >
             <MaterialCommunityIcons name={item.icon} size={20} color={COLORS.primary} />

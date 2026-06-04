@@ -1,6 +1,7 @@
 import React from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const COLORS = {
   primary: '#1a365d',
@@ -10,23 +11,34 @@ const COLORS = {
 };
 
 const NAV_ITEMS = [
-  { route: 'Home', label: 'Home', icon: 'home-outline', activeIcon: 'home' },
-  { route: 'Search', label: 'Search', icon: 'magnify', activeIcon: 'magnify' },
-  { route: 'Application', label: 'Apps', icon: 'file-document-outline', activeIcon: 'file-document' },
-  { route: 'Profile', label: 'Profile', icon: 'account-outline', activeIcon: 'account' },
+  { key: 'home', route: 'JobSeekerDashboard', params: { tab: 'home' }, label: 'Home', icon: 'home-outline', activeIcon: 'home' },
+  { key: 'search', route: 'JobSeekerDashboard', params: { tab: 'search' }, label: 'Search', icon: 'magnify', activeIcon: 'magnify' },
+  { key: 'applications', route: 'JobSeekerDashboard', params: { tab: 'applications' }, label: 'Apps', icon: 'file-document-outline', activeIcon: 'file-document' },
+  { key: 'profile', route: 'JobSeekerDashboard', params: { tab: 'profile' }, label: 'Profile', icon: 'account-outline', activeIcon: 'account' },
 ];
 
-export default function BottomNav({ navigation, activeRoute }) {
+export default function BottomNav({ navigation, activeRoute, onTabPress }) {
+  const insets = useSafeAreaInsets();
+
+  const handlePress = (item) => {
+    if (typeof onTabPress === 'function') {
+      onTabPress(item.key);
+      return;
+    }
+
+    navigation.navigate(item.route, item.params);
+  };
+
   return (
-    <View style={styles.bottomNav}>
+    <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 12) }]}>
       {NAV_ITEMS.map((item) => {
-        const isActive = item.route === activeRoute;
+        const isActive = item.key === activeRoute || item.route === activeRoute;
 
         return (
           <TouchableOpacity
-            key={item.route}
+            key={item.key}
             style={isActive ? styles.navItemActive : styles.navItem}
-            onPress={() => navigation.navigate(item.route)}
+            onPress={() => handlePress(item)}
           >
             {isActive ? (
               <View style={styles.activeNavIndicator}>
@@ -54,7 +66,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: COLORS.white,
     paddingTop: 10,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
     borderTopWidth: 1,
     borderTopColor: COLORS.outline,
   },
