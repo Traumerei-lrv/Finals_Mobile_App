@@ -10,6 +10,8 @@ const COLORS = {
   white: '#ffffff',
 };
 
+export const BOTTOM_NAV_BASE_HEIGHT = 92;
+
 const NAV_ITEMS = [
   { key: 'home', route: 'JobSeekerDashboard', params: { tab: 'home' }, label: 'Home', icon: 'home-outline', activeIcon: 'home' },
   { key: 'search', route: 'JobSeekerDashboard', params: { tab: 'search' }, label: 'Search', icon: 'magnify', activeIcon: 'magnify' },
@@ -19,6 +21,8 @@ const NAV_ITEMS = [
 
 export default function BottomNav({ navigation, activeRoute, onTabPress }) {
   const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 12);
+  const navHeight = BOTTOM_NAV_BASE_HEIGHT + bottomPadding;
 
   const handlePress = (item) => {
     if (typeof onTabPress === 'function') {
@@ -30,7 +34,7 @@ export default function BottomNav({ navigation, activeRoute, onTabPress }) {
   };
 
   return (
-    <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 12) }]}>
+    <View style={[styles.bottomNav, { paddingBottom: bottomPadding, minHeight: navHeight }]}>
       {NAV_ITEMS.map((item) => {
         const isActive = item.key === activeRoute || item.route === activeRoute;
 
@@ -60,23 +64,24 @@ export default function BottomNav({ navigation, activeRoute, onTabPress }) {
 
 const styles = StyleSheet.create({
   bottomNav: {
-    position: 'absolute',
-    bottom: 0,
     width: '100%',
     flexDirection: 'row',
     backgroundColor: COLORS.white,
     paddingTop: 10,
+    paddingHorizontal: 6,
     borderTopWidth: 1,
     borderTopColor: COLORS.outline,
   },
   navItem: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
   },
   navItemActive: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   activeNavIndicator: {
     backgroundColor: '#8AB4F8',

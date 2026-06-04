@@ -49,6 +49,13 @@ const ReactNativeLogin = ({ navigation }) => {
   const [error, setError] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
   const isExpoGo = Boolean(Constants.expoGoConfig);
+  // Expo Go does not bundle the native Google Sign-In module, so load it only in real native builds.
+  const nativeGoogleSignIn =
+    Platform.OS === 'web' || isExpoGo
+      ? null
+      : require('@react-native-google-signin/google-signin');
+  const GoogleSignin = nativeGoogleSignIn?.GoogleSignin ?? null;
+  const statusCodes = nativeGoogleSignIn?.statusCodes ?? {};
   const firebaseProjectNumber = '139373810157';
 
   const getAuthErrorMessage = (prefix, authError) => {
@@ -57,12 +64,66 @@ const ReactNativeLogin = ({ navigation }) => {
     return `${prefix}${code}${message}`;
   };
 
+  const validateSignedInUser = async (signedInUser) => {
+    const profileSnap = await getDoc(doc(db, 'users', signedInUser.uid));
+    const profile = profileSnap.exists() ? profileSnap.data() : null;
+
+    if (profile?.active === false) {
+      await signOut(auth);
+      if (Platform.OS !== 'web') {
+        await GoogleSignin?.signOut?.().catch(() => {});
+      }
+      throw new Error('This account has been deactivated. Please contact an administrator.');
+    }
+  };
+
+  const getGoogleSignInErrorMessage = (signInError) => {
+    if (signInError?.message === 'This account has been deactivated. Please contact an administrator.') {
+      return signInError.message;
+    }
+
+    if (signInError?.code === statusCodes.SIGN_IN_CANCELLED) {
+      return '';
+    }
+
+    if (signInError?.code === statusCodes.IN_PROGRESS) {
+      return 'Google Sign-In is already in progress.';
+    }
+
+    if (signInError?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+      return 'Google Play Services is not available or needs an update on this device.';
+    }
+
+    if (
+      String(signInError?.message || '').includes('DEVELOPER_ERROR') ||
+      String(signInError?.message || '').includes('code 10') ||
+      String(signInError?.message || '').includes('10:')
+    ) {
+      return 'Google Sign-In configuration mismatch. Check the Android package name, SHA-1 fingerprint, and Android OAuth client ID.';
+    }
+
+    return getAuthErrorMessage('Google Sign-In failed', signInError);
+  };
+
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
     webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
     selectAccount: true,
   });
+
+  useEffect(() => {
+    if (Platform.OS === 'web' || !GoogleSignin) {
+      return;
+    }
+
+    GoogleSignin.configure({
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+      iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+      offlineAccess: false,
+      scopes: ['profile', 'email'],
+    });
+  }, []);
 
   const handleSignIn = async () => {
     setError('');
@@ -73,18 +134,14 @@ const ReactNativeLogin = ({ navigation }) => {
 
     setLoading(true);
     try {
-      // Sign in using Firebase Auth (email/password)
       const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
-      const profileSnap = await getDoc(doc(db, 'users', credential.user.uid));
-      const profile = profileSnap.exists() ? profileSnap.data() : null;
-      if (profile?.active === false) {
-        await signOut(auth);
-        setError('This account has been deactivated. Please contact an administrator.');
-      }
+      await validateSignedInUser(credential.user);
     } catch (e) {
       console.error('SignIn error', e);
 
-      if (e?.code === 'auth/api-key-not-valid') {
+      if (e?.message === 'This account has been deactivated. Please contact an administrator.') {
+        setError(e.message);
+      } else if (e?.code === 'auth/api-key-not-valid') {
         setError('Firebase config error: invalid API key. Update firebase.js with a valid Web API key.');
       } else if (e?.code === 'auth/invalid-credential') {
         setError('Invalid email or password.');
@@ -132,20 +189,50 @@ const ReactNativeLogin = ({ navigation }) => {
       return;
     }
 
-    if (!request) {
+    if (Platform.OS === 'web' && !request) {
       setError('Google sign-in is not ready yet. Please try again in a moment.');
       return;
     }
 
     try {
       setGoogleLoading(true);
-      const result = await promptAsync({ showInRecents: true });
-      if (result.type === 'dismiss' || result.type === 'cancel') {
-        setGoogleLoading(false);
+      if (Platform.OS === 'web') {
+        const result = await promptAsync({ showInRecents: true });
+        if (result.type === 'dismiss' || result.type === 'cancel') {
+          setGoogleLoading(false);
+        }
+        return;
       }
+
+      if (!GoogleSignin) {
+        setError('Google Sign-In is only available in a development build or production build on mobile.');
+        setGoogleLoading(false);
+        return;
+      }
+
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const nativeResult = await GoogleSignin.signIn();
+
+      if (nativeResult.type === 'cancelled') {
+        setGoogleLoading(false);
+        return;
+      }
+
+      const idToken = nativeResult.data?.idToken;
+      if (!idToken) {
+        throw new Error('Google Sign-In did not return an ID token. Check that the web client ID is configured correctly.');
+      }
+
+      const credential = GoogleAuthProvider.credential(idToken);
+      const result = await signInWithCredential(auth, credential);
+      await validateSignedInUser(result.user);
+      setGoogleLoading(false);
     } catch (promptError) {
       console.error('Google prompt error', promptError);
-      setError('Unable to start Google Sign-In. Please try again.');
+      const message = getGoogleSignInErrorMessage(promptError);
+      if (message) {
+        setError(message);
+      }
       setGoogleLoading(false);
     }
   };
@@ -176,10 +263,11 @@ const ReactNativeLogin = ({ navigation }) => {
 
       try {
         const credential = GoogleAuthProvider.credential(idToken);
-        await signInWithCredential(auth, credential);
+        const result = await signInWithCredential(auth, credential);
+        await validateSignedInUser(result.user);
       } catch (authError) {
         console.error('Google sign in error', authError);
-        setError(getAuthErrorMessage('Google Sign-In failed', authError));
+        setError(getGoogleSignInErrorMessage(authError));
       } finally {
         setGoogleLoading(false);
       }
@@ -271,7 +359,7 @@ const ReactNativeLogin = ({ navigation }) => {
               <TouchableOpacity
                 style={[styles.socialButton, Platform.OS !== 'web' && isExpoGo && styles.socialButtonDisabled]}
                 onPress={handleGoogleSignIn}
-                disabled={!request || googleLoading || (Platform.OS !== 'web' && isExpoGo)}
+                disabled={(Platform.OS === 'web' && !request) || googleLoading || (Platform.OS !== 'web' && isExpoGo)}
               >
                 <Image
                   source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/512px-Google_%22G%22_Logo.svg.png' }}

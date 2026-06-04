@@ -466,7 +466,7 @@ export default function AdminDashboard({ navigation }) {
         extraHeight={Platform.OS === 'ios' ? 24 : 140}
         extraScrollHeight={Platform.OS === 'ios' ? 24 : 140}
         keyboardOpeningTime={0}
-        contentContainerStyle={[styles.inner, { paddingBottom: 120 + insets.bottom }]}
+        contentContainerStyle={[styles.inner, { paddingBottom: 156 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
@@ -737,7 +737,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 20,
   },
-  inner: { padding: 20, paddingBottom: 36 },
+  inner: { padding: 20, paddingBottom: 36, flexGrow: 1 },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

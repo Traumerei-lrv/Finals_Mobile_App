@@ -16,7 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
-import BottomNav from '../components/BottomNav';
+import BottomNav, { BOTTOM_NAV_BASE_HEIGHT } from '../components/BottomNav';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
 import SidebarMenu from '../components/SidebarMenu';
 import {
@@ -96,6 +96,8 @@ function getTabFromRoute(route) {
 
 export default function JobSeekerDashboard({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  const bottomNavPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 12);
+  const bottomNavHeight = BOTTOM_NAV_BASE_HEIGHT + bottomNavPadding;
   const { user, userProfile } = useAuthContext();
   const [activeTab, setActiveTab] = useState(() => getTabFromRoute(route));
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -360,75 +362,77 @@ export default function JobSeekerDashboard({ navigation, route }) {
         </TouchableOpacity>
       </View>
 
-      <KeyboardAwareScrollView
-        style={styles.flex}
-        enableOnAndroid
-        enableAutomaticScroll
-        extraHeight={Platform.OS === 'ios' ? 24 : 112}
-        extraScrollHeight={Platform.OS === 'ios' ? 24 : 112}
-        keyboardOpeningTime={0}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 110 + insets.bottom }]}
-      >
+      <View style={styles.contentArea}>
+        <KeyboardAwareScrollView
+          style={styles.flex}
+          enableOnAndroid
+          enableAutomaticScroll
+          extraHeight={Platform.OS === 'ios' ? 24 : 112}
+          extraScrollHeight={Platform.OS === 'ios' ? 24 : 112}
+          keyboardOpeningTime={0}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {activeTab === 'home' ? (
+            <HomeTab
+              homeSearch={homeSearch}
+              setHomeSearch={setHomeSearch}
+              featuredJob={featuredJob}
+              displayedJobs={displayedJobs}
+              savedJobIds={savedJobIds}
+              getJobId={getJobId}
+              onFindJobs={handleFindJobsFromHome}
+              onToggleSaveJob={handleToggleSaveJob}
+              onOpenJob={(job) => navigation.navigate('JobDetails', { job })}
+            />
+          ) : null}
+
+          {activeTab === 'search' ? (
+            <SearchTab
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              recentSearches={recentSearches}
+              recommendedJobs={recommendedJobs}
+              savedJobIds={savedJobIds}
+              getJobId={getJobId}
+              onSearchSubmit={handleSearchSubmit}
+              onClearRecentSearches={handleClearAllRecentSearches}
+              onRecentSearchPress={handleRecentSearchPress}
+              onToggleSaveJob={handleToggleSaveJob}
+              onOpenJob={(job) => navigation.navigate('JobDetails', { job })}
+            />
+          ) : null}
+
+          {activeTab === 'applications' ? (
+            <ApplicationsTab
+              activeTab={applicationTab}
+              applications={filteredApplications}
+              onTabChange={setApplicationTab}
+              onOpenJob={setSelectedApplicationJob}
+              onDeleteApplication={handleDeleteArchivedApplication}
+            />
+          ) : null}
+
+          {activeTab === 'profile' ? (
+            <ProfileTab
+              profile={profile}
+              avatarSource={avatarSource}
+              appliedCount={appliedCount}
+              savedCount={savedCount}
+              navigation={navigation}
+              onLogout={() => setLogoutModalVisible(true)}
+            />
+          ) : null}
+        </KeyboardAwareScrollView>
+
         {activeTab === 'home' ? (
-          <HomeTab
-            homeSearch={homeSearch}
-            setHomeSearch={setHomeSearch}
-            featuredJob={featuredJob}
-            displayedJobs={displayedJobs}
-            savedJobIds={savedJobIds}
-            getJobId={getJobId}
-            onFindJobs={handleFindJobsFromHome}
-            onToggleSaveJob={handleToggleSaveJob}
-            onOpenJob={(job) => navigation.navigate('JobDetails', { job })}
-          />
-        ) : null}
-
-        {activeTab === 'search' ? (
-          <SearchTab
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            recentSearches={recentSearches}
-            recommendedJobs={recommendedJobs}
-            savedJobIds={savedJobIds}
-            getJobId={getJobId}
-            onSearchSubmit={handleSearchSubmit}
-            onClearRecentSearches={handleClearAllRecentSearches}
-            onRecentSearchPress={handleRecentSearchPress}
-            onToggleSaveJob={handleToggleSaveJob}
-            onOpenJob={(job) => navigation.navigate('JobDetails', { job })}
-          />
-        ) : null}
-
-        {activeTab === 'applications' ? (
-          <ApplicationsTab
-            activeTab={applicationTab}
-            applications={filteredApplications}
-            onTabChange={setApplicationTab}
-            onOpenJob={setSelectedApplicationJob}
-            onDeleteApplication={handleDeleteArchivedApplication}
-          />
-        ) : null}
-
-        {activeTab === 'profile' ? (
-          <ProfileTab
-            profile={profile}
-            avatarSource={avatarSource}
-            appliedCount={appliedCount}
-            savedCount={savedCount}
-            navigation={navigation}
-            onLogout={() => setLogoutModalVisible(true)}
-          />
-        ) : null}
-      </KeyboardAwareScrollView>
-
-        {activeTab === 'home' ? (
-          <TouchableOpacity style={[styles.fab, { bottom: 96 + insets.bottom }]}>
+          <TouchableOpacity style={[styles.fab, { bottom: bottomNavHeight + 14 }]}>
             <MaterialCommunityIcons name="pencil-outline" size={24} color={COLORS.white} />
           </TouchableOpacity>
         ) : null}
+      </View>
 
         <BottomNav
           navigation={navigation}
@@ -1174,6 +1178,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.surface,
   },
+  contentArea: {
+    flex: 1,
+    position: 'relative',
+  },
   flex: {
     flex: 1,
   },
@@ -1194,7 +1202,8 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Hanken Grotesk' : 'sans-serif',
   },
   scrollContent: {
-    paddingBottom: 120,
+    flexGrow: 1,
+    paddingBottom: 24,
   },
   searchContainer: {
     padding: 20,

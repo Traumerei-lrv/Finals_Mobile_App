@@ -15,7 +15,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { signOut } from 'firebase/auth';
-import RecruiterBottomNav from '../../components/RecruiterBottomNav';
+import RecruiterBottomNav, { RECRUITER_BOTTOM_NAV_BASE_HEIGHT } from '../../components/RecruiterBottomNav';
 import RecruiterSidebarMenu from '../../components/RecruiterSidebarMenu';
 import LogoutConfirmModal from '../../components/LogoutConfirmModal';
 import { useAuthContext } from '../../context/AuthContext';
@@ -76,6 +76,8 @@ function getTabFromRoute(route) {
 
 export default function RecruiterDashboard({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  const bottomNavPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 12);
+  const bottomNavHeight = RECRUITER_BOTTOM_NAV_BASE_HEIGHT + bottomNavPadding;
   const { isAdmin, recruiterProfile, userProfile, user } = useAuthContext();
   const [activeTab, setActiveTab] = useState(() => getTabFromRoute(route));
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -349,70 +351,71 @@ export default function RecruiterDashboard({ navigation, route }) {
         </View>
       </View>
 
-      <KeyboardAwareScrollView
-        style={styles.flex}
-        enableOnAndroid
-        enableAutomaticScroll
-        extraHeight={Platform.OS === 'ios' ? 24 : 124}
-        extraScrollHeight={Platform.OS === 'ios' ? 24 : 124}
-        keyboardOpeningTime={0}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}
-      >
-        {activeTab === 'home' ? (
-          <HomeTab
-            jobs={jobs}
-            recentJobs={recentJobs}
-            pendingApplications={pendingApplications}
-            applications={applications}
-            applicantsCountByJobId={applicantsCountByJobId}
-            onOpenApplicants={openApplicantsView}
-          />
-        ) : null}
+      <View style={styles.contentArea}>
+        <KeyboardAwareScrollView
+          style={styles.flex}
+          enableOnAndroid
+          enableAutomaticScroll
+          extraHeight={Platform.OS === 'ios' ? 24 : 124}
+          extraScrollHeight={Platform.OS === 'ios' ? 24 : 124}
+          keyboardOpeningTime={0}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {activeTab === 'home' ? (
+            <HomeTab
+              jobs={jobs}
+              recentJobs={recentJobs}
+              pendingApplications={pendingApplications}
+              applications={applications}
+              applicantsCountByJobId={applicantsCountByJobId}
+              onOpenApplicants={openApplicantsView}
+            />
+          ) : null}
 
-        {activeTab === 'post_job' ? (
-          <PostJobTab
-            navigation={navigation}
-            workMode={workMode}
-            setWorkMode={setWorkMode}
-            formData={formData}
-            setFormData={setFormData}
-            creatingJob={creatingJob}
-            onContinue={handleContinueToStep2}
-            onQuickPost={handleQuickPostJob}
-          />
-        ) : null}
+          {activeTab === 'post_job' ? (
+            <PostJobTab
+              navigation={navigation}
+              workMode={workMode}
+              setWorkMode={setWorkMode}
+              formData={formData}
+              setFormData={setFormData}
+              creatingJob={creatingJob}
+              onContinue={handleContinueToStep2}
+              onQuickPost={handleQuickPostJob}
+            />
+          ) : null}
 
-        {activeTab === 'applicants' ? (
-          <ApplicantsTab
-            selectedJobId={selectedJobId}
-            setSelectedJobId={setSelectedJobId}
-            search={applicantSearch}
-            setSearch={setApplicantSearch}
-            jobCards={jobCards}
-            selectedJob={selectedJob}
-            selectedJobApplications={selectedJobApplications}
-            navigation={navigation}
-          />
-        ) : null}
+          {activeTab === 'applicants' ? (
+            <ApplicantsTab
+              selectedJobId={selectedJobId}
+              setSelectedJobId={setSelectedJobId}
+              search={applicantSearch}
+              setSearch={setApplicantSearch}
+              jobCards={jobCards}
+              selectedJob={selectedJob}
+              selectedJobApplications={selectedJobApplications}
+              navigation={navigation}
+            />
+          ) : null}
 
-        {activeTab === 'profile' ? (
-          <ProfileTab
-            recruiterName={recruiterName}
-            recruiterEmail={recruiterEmail}
-            companyName={companyName}
-            initials={initials}
-            aboutCompany={aboutCompany}
-            totalActiveJobs={totalActiveJobs}
-            totalApplicants={applications.length}
-            hiresThisQuarter={hiresThisQuarter}
-            navigation={navigation}
-            onLogout={() => setLogoutModalVisible(true)}
-          />
-        ) : null}
-      </KeyboardAwareScrollView>
+          {activeTab === 'profile' ? (
+            <ProfileTab
+              recruiterName={recruiterName}
+              recruiterEmail={recruiterEmail}
+              companyName={companyName}
+              initials={initials}
+              aboutCompany={aboutCompany}
+              totalActiveJobs={totalActiveJobs}
+              totalApplicants={applications.length}
+              hiresThisQuarter={hiresThisQuarter}
+              navigation={navigation}
+              onLogout={() => setLogoutModalVisible(true)}
+            />
+          ) : null}
+        </KeyboardAwareScrollView>
 
         <RecruiterBottomNav
           navigation={navigation}
@@ -420,6 +423,7 @@ export default function RecruiterDashboard({ navigation, route }) {
           showFab
           onTabPress={handleTabChange}
         />
+      </View>
 
       <LogoutConfirmModal
         visible={logoutModalVisible}
@@ -900,6 +904,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.surface,
   },
+  contentArea: {
+    flex: 1,
+    position: 'relative',
+  },
   flex: {
     flex: 1,
   },
@@ -941,7 +949,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   scrollContent: {
+    flexGrow: 1,
     paddingTop: 16,
+    paddingBottom: 24,
   },
   sectionHeader: {
     paddingHorizontal: 20,

@@ -148,7 +148,20 @@ export async function submitJobApplication({ job, applicant, formData }) {
 export async function hasApplicantAppliedToJob({ jobId, applicantId }) {
   if (!jobId || !applicantId) return false;
   const snap = await getDoc(doc(db, 'applications', appDocId(jobId, applicantId)));
-  return snap.exists();
+  if (!snap.exists()) {
+    return false;
+  }
+
+  const application = normalizeApplication(snap.data(), snap.id);
+  const statusType = String(application.statusType ?? 'applied').toLowerCase();
+
+  // Match the dashboard's visible "My Applications" behavior so archived or closed-out
+  // applications do not block the user from applying again from the jobs feed.
+  if (application.applicantArchived) {
+    return false;
+  }
+
+  return statusType !== 'withdrawn' && statusType !== 'declined';
 }
 
 export function subscribeToRecruiterApplications({ recruiterId, onData, onError, includeArchived = false }) {

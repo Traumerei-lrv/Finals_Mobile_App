@@ -11,6 +11,8 @@ const COLORS = {
   accentBlue: '#8AB4F8',
 };
 
+export const RECRUITER_BOTTOM_NAV_BASE_HEIGHT = 92;
+
 const NAV_ITEMS = [
   {
     key: 'home',
@@ -44,6 +46,8 @@ const NAV_ITEMS = [
 
 const RecruiterBottomNav = ({ navigation, activeTab = 'home', showFab = true, onTabPress }) => {
   const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 12);
+  const navHeight = RECRUITER_BOTTOM_NAV_BASE_HEIGHT + bottomPadding;
 
   const handlePress = (item) => {
     if (typeof onTabPress === 'function') {
@@ -58,14 +62,14 @@ const RecruiterBottomNav = ({ navigation, activeTab = 'home', showFab = true, on
     <>
       {showFab ? (
         <TouchableOpacity
-          style={[styles.fab, { bottom: 100 + insets.bottom }]}
+          style={[styles.fab, { bottom: navHeight + 18 }]}
           onPress={() => handlePress(NAV_ITEMS[1])}
         >
           <MaterialCommunityIcons name="plus" size={32} color={COLORS.white} />
         </TouchableOpacity>
       ) : null}
 
-      <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 12) }]}>
+      <View style={[styles.bottomNav, { paddingBottom: bottomPadding, minHeight: navHeight }]}>
         {NAV_ITEMS.map((item) => {
           const isActive = activeTab === item.key;
 
@@ -90,7 +94,6 @@ const RecruiterBottomNav = ({ navigation, activeTab = 'home', showFab = true, on
 const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
-    bottom: 100,
     right: 20,
     width: 56,
     height: 56,
@@ -105,18 +108,18 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   bottomNav: {
-    position: 'absolute',
-    bottom: 0,
     width: '100%',
     flexDirection: 'row',
     backgroundColor: COLORS.white,
     paddingTop: 10,
+    paddingHorizontal: 6,
     borderTopWidth: 1,
     borderTopColor: COLORS.outline,
   },
   navItem: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
   },
   activeNavIndicator: {
