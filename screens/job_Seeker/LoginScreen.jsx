@@ -41,6 +41,8 @@ const COLORS = {
   apple: '#ffffff',
 };
 
+const APP_LOGO = require('../../logo/app_logo_1-removebg-preview.png');
+
 const ReactNativeLogin = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -169,13 +171,6 @@ const ReactNativeLogin = ({ navigation }) => {
       return;
     }
 
-    if (Platform.OS !== 'web' && isExpoGo) {
-      setError(
-        'Google Sign-In is not supported in Expo Go for this app. Use a development build or a production build to test Google login on mobile.'
-      );
-      return;
-    }
-
     const providedClientId =
       process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
       process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
@@ -196,17 +191,11 @@ const ReactNativeLogin = ({ navigation }) => {
 
     try {
       setGoogleLoading(true);
-      if (Platform.OS === 'web') {
+      if (Platform.OS === 'web' || !GoogleSignin) {
         const result = await promptAsync({ showInRecents: true });
         if (result.type === 'dismiss' || result.type === 'cancel') {
           setGoogleLoading(false);
         }
-        return;
-      }
-
-      if (!GoogleSignin) {
-        setError('Google Sign-In is only available in a development build or production build on mobile.');
-        setGoogleLoading(false);
         return;
       }
 
@@ -284,7 +273,8 @@ const ReactNativeLogin = ({ navigation }) => {
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.header}>
-            <Text style={styles.title}>Welcome to Career Go</Text>
+            <Image source={APP_LOGO} style={styles.appLogo} resizeMode="contain" />
+            <Text style={styles.title}>Welcome</Text>
             <Text style={styles.subtitle}>Sign in to accelerate your career</Text>
           </View>
 
@@ -307,9 +297,6 @@ const ReactNativeLogin = ({ navigation }) => {
             {/* Password Field */}
             <View style={styles.labelRow}>
               <Text style={styles.label}>Password</Text>
-              <TouchableOpacity>
-                <Text style={styles.forgotText}>Forgot Password?</Text>
-              </TouchableOpacity>
             </View>
             <View style={styles.inputContainer}>
               <MaterialCommunityIcons name="lock-outline" size={20} color={COLORS.secondary} style={styles.inputIcon} />
@@ -357,9 +344,9 @@ const ReactNativeLogin = ({ navigation }) => {
             {/* Social Buttons */}
             <View style={styles.socialRow}>
               <TouchableOpacity
-                style={[styles.socialButton, Platform.OS !== 'web' && isExpoGo && styles.socialButtonDisabled]}
+                style={styles.socialButton}
                 onPress={handleGoogleSignIn}
-                disabled={(Platform.OS === 'web' && !request) || googleLoading || (Platform.OS !== 'web' && isExpoGo)}
+                disabled={(Platform.OS === 'web' && !request) || googleLoading}
               >
                 <Image
                   source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/512px-Google_%22G%22_Logo.svg.png' }}
@@ -368,12 +355,6 @@ const ReactNativeLogin = ({ navigation }) => {
                 <Text style={styles.socialText}>{googleLoading ? 'Signing in...' : 'Google'}</Text>
               </TouchableOpacity>
             </View>
-
-            {Platform.OS !== 'web' && isExpoGo ? (
-              <Text style={styles.helperText}>
-                Google Sign-In needs a development build or production build on mobile. Expo Go cannot complete this OAuth flow.
-              </Text>
-            ) : null}
 
             {/* Sign Up Link */}
             <View style={styles.footer}>
@@ -407,6 +388,11 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 48,
+  },
+  appLogo: {
+    width: 180,
+    height: 110,
+    marginBottom: 18,
   },
   title: {
     fontSize: 28,
@@ -510,9 +496,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  socialButtonDisabled: {
-    opacity: 0.55,
   },
   socialIcon: {
     width: 20,

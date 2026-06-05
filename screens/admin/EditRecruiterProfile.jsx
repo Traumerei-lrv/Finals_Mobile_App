@@ -210,28 +210,6 @@ const EditCompanyProfileScreen = ({ navigation }) => {
 
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* Bottom Nav Bar */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
-          <MaterialCommunityIcons name="format-list-bulleted" size={24} color={COLORS.secondary} />
-          <Text style={styles.navLabel}>Jobs</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <MaterialCommunityIcons name="account-group-outline" size={24} color={COLORS.secondary} />
-          <Text style={styles.navLabel}>Candidates</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <MaterialCommunityIcons name="chart-timeline-variant" size={24} color={COLORS.secondary} />
-          <Text style={styles.navLabel}>Pipeline</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItemActive}>
-          <View style={styles.activeNavIndicator}>
-            <MaterialCommunityIcons name="cog" size={24} color={COLORS.primary} />
-            <Text style={styles.navLabelActive}>Settings</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 };
@@ -463,44 +441,6 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontSize: 16,
     fontWeight: '700',
-  },
-  bottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    width: '100%',
-    flexDirection: 'row',
-    backgroundColor: COLORS.white,
-    paddingTop: 10,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.outline,
-  },
-  navItem: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-  },
-  navItemActive: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  activeNavIndicator: {
-    backgroundColor: '#8AB4F8',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navLabel: {
-    fontSize: 11,
-    color: COLORS.secondary,
-    fontWeight: '600',
-  },
-  navLabelActive: {
-    fontSize: 11,
-    color: COLORS.primary,
-    fontWeight: '800',
   },
 });
 
