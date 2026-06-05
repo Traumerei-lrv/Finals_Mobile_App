@@ -179,7 +179,7 @@ const SubmitApplicationScreen = ({ navigation, route }) => {
             <TextInput
               style={styles.input}
               value={formData.resumeUrl}
-              placeholder="Paste Google Drive share link (https://drive.google.com/...)"
+              placeholder="Paste Google Drive link of the resume"
               autoCapitalize="none"
               onChangeText={(text) => setFormData({ ...formData, resumeUrl: text })}
             />

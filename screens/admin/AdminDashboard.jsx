@@ -196,6 +196,8 @@ export default function AdminDashboard({ navigation }) {
   function applyFilters() {
     const q = searchText.trim().toLowerCase();
     return users.filter((u) => {
+      const deleted = isUserDeleted(u);
+
       if (filterRole !== 'all') {
         const r = getUserRole(u).toLowerCase();
         if (r !== filterRole) return false;
@@ -203,9 +205,11 @@ export default function AdminDashboard({ navigation }) {
       if (filterStatus !== 'all') {
         if (filterStatus === 'active' && u.disabled) return false;
         if (filterStatus === 'disabled' && !u.disabled) return false;
-        if (filterStatus === 'deleted' && !isUserDeleted(u)) return false;
-        if (filterStatus === 'active' && isUserDeleted(u)) return false;
-        if (filterStatus === 'disabled' && isUserDeleted(u)) return false;
+        if (filterStatus === 'deleted' && !deleted) return false;
+        if (filterStatus === 'active' && deleted) return false;
+        if (filterStatus === 'disabled' && deleted) return false;
+      } else if (deleted) {
+        return false;
       }
       if (!q) return true;
       const name = getUserName(u).toLowerCase();
@@ -401,30 +405,47 @@ export default function AdminDashboard({ navigation }) {
   }
 
   async function toggleDisabled(uid, disabled) {
-    try {
-      if (isCurrentAdminUser(uid)) {
-        Alert.alert('Blocked', 'You cannot deactivate or activate your own admin account from this dashboard.');
-        return;
-      }
-
-      if (functionsClient) {
-        const adminSet = httpsCallable(functionsClient, 'adminSetDisabled');
-        const res = await adminSet({ uid, disabled });
-        if (res.data && res.data.success) {
-          fetchUsers();
-        }
-        return;
-      }
-
-      await updateDoc(doc(db, 'users', uid), {
-        active: !disabled,
-        updatedAt: serverTimestamp(),
-      });
-      fetchUsers();
-    } catch (err) {
-      console.error('toggleDisabled error', err);
-      Alert.alert('Error', 'Failed to update user');
+    if (isCurrentAdminUser(uid)) {
+      Alert.alert('Blocked', 'You cannot deactivate or activate your own admin account from this dashboard.');
+      return;
     }
+
+    const selectedUser = users.find((user) => user.uid === uid);
+    const actionLabel = disabled ? 'Deactivate' : 'Activate';
+    const userLabel = getUserEmail(selectedUser) !== '—' ? getUserEmail(selectedUser) : getUserName(selectedUser);
+
+    Alert.alert(
+      `${actionLabel} user`,
+      `${actionLabel} ${userLabel}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: actionLabel,
+          style: disabled ? 'destructive' : 'default',
+          onPress: async () => {
+            try {
+              if (functionsClient) {
+                const adminSet = httpsCallable(functionsClient, 'adminSetDisabled');
+                const res = await adminSet({ uid, disabled });
+                if (res.data && res.data.success) {
+                  fetchUsers();
+                }
+                return;
+              }
+
+              await updateDoc(doc(db, 'users', uid), {
+                active: !disabled,
+                updatedAt: serverTimestamp(),
+              });
+              fetchUsers();
+            } catch (err) {
+              console.error('toggleDisabled error', err);
+              Alert.alert('Error', `Failed to ${disabled ? 'deactivate' : 'activate'} user`);
+            }
+          },
+        },
+      ],
+    );
   }
 
   async function handleDelete(uid) {
@@ -433,16 +454,28 @@ export default function AdminDashboard({ navigation }) {
       return;
     }
 
-    Alert.alert('Confirm', 'Delete this user (soft delete)?', [
+    const selectedUser = users.find((user) => user.uid === uid);
+    const userLabel = getUserEmail(selectedUser) !== '—' ? getUserEmail(selectedUser) : getUserName(selectedUser);
+
+    Alert.alert('Delete user', `Delete ${userLabel}? This will mark the account as deleted and remove access.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         try {
-          if (!functionsClient) throw new Error('Functions client not initialized');
-          const adminDelete = httpsCallable(functionsClient, 'adminDeleteUser');
-          const res = await adminDelete({ uid, soft: true });
-          if (res.data && res.data.success) {
-            fetchUsers();
+          if (functionsClient) {
+            const adminDelete = httpsCallable(functionsClient, 'adminDeleteUser');
+            const res = await adminDelete({ uid, soft: true });
+            if (res.data && res.data.success) {
+              fetchUsers();
+            }
+            return;
           }
+
+          await updateDoc(doc(db, 'users', uid), {
+            active: false,
+            deletedAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+          fetchUsers();
         } catch (err) {
           console.error('delete error', err);
           Alert.alert('Error', 'Failed to delete user');
@@ -636,7 +669,7 @@ export default function AdminDashboard({ navigation }) {
                               <TouchableOpacity onPress={() => toggleDisabled(item.uid, !item.disabled)} style={[styles.smallButton, isSelf && styles.actionDisabled]} disabled={isSelf}>
                                 <Text style={isSelf && styles.actionDisabledText}>{item.disabled ? 'Activate' : 'Deactivate'}</Text>
                               </TouchableOpacity>
-                              <TouchableOpacity onPress={() => handleDelete(item.uid)} style={[styles.smallButton, { borderColor: '#f8d7da' }, isSelf && styles.actionDisabled]} disabled={!functionsClient || isSelf}>
+                              <TouchableOpacity onPress={() => handleDelete(item.uid)} style={[styles.smallButton, { borderColor: '#f8d7da' }, isSelf && styles.actionDisabled]} disabled={isSelf}>
                                 <Text style={[{ color: 'red' }, isSelf && styles.actionDisabledText]}>Delete</Text>
                               </TouchableOpacity>
                             </View>

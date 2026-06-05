@@ -1,17 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import RecruiterBottomNav from '../../components/RecruiterBottomNav';
 import RecruiterSidebarMenu from '../../components/RecruiterSidebarMenu';
 import { auth } from '../../firebase';
 import { subscribeToRecruiterApplications } from '../../utils/applicationsFirestore';
+import { useAuthContext } from '../../context/AuthContext';
 
 const COLORS = {
   primary: '#1a365d',
@@ -23,6 +24,8 @@ const COLORS = {
 };
 
 export default function ArchivedApplicationsScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
+  const { isAdmin } = useAuthContext();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [applications, setApplications] = useState([]);
 
@@ -43,21 +46,34 @@ export default function ArchivedApplicationsScreen({ navigation }) {
     [applications],
   );
 
+  const handleSidebarItemPress = (item) => {
+    setSidebarOpen(false);
+
+    if (item.route === 'RecruiterDashboard' && item.params?.tab) {
+      navigation.navigate(item.route, item.params);
+      return;
+    }
+
+    navigation.navigate(item.route, item.params);
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <RecruiterSidebarMenu
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         navigation={navigation}
         activeRoute="ArchivedApplications"
+        onItemPress={handleSidebarItemPress}
+        showAdmin={isAdmin && typeof isAdmin === 'function' ? isAdmin() : false}
       />
 
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 10) + 2 }]}>
         <TouchableOpacity style={styles.iconButton} onPress={() => setSidebarOpen(true)}>
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Archived Applications</Text>
-        <View style={{ width: 24 }} />
+        <View style={styles.headerRightSpacer} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -132,6 +148,7 @@ const styles = StyleSheet.create({
   },
   iconButton: { padding: 4 },
   headerTitle: { fontSize: 20, fontWeight: '800', color: COLORS.primary },
+  headerRightSpacer: { width: 24 },
   scrollContent: { paddingBottom: 120, paddingTop: 16 },
   summaryCard: {
     marginHorizontal: 20,
