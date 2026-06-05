@@ -18,9 +18,11 @@
       "bundleIdentifier": "com.careergo.mobile"
     },
     "android": {
+      "googleServicesFile": "./google-services.json",
+      "icon": "./assets/icon.png",
       "package": "com.careergo.mobile",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": false,
@@ -45,6 +47,12 @@
           "iosUrlScheme": "com.googleusercontent.apps.139373810157-b0cdkq0avp21fg2s3f7dm78j4c0cq8sl"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b00ee54a-6444-4ab6-ae07-6d7cb2abe2d4"
+      }
+    },
+    "owner": "traum"
   }
 }

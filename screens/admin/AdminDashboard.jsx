@@ -342,7 +342,6 @@ export default function AdminDashboard({ navigation }) {
           setSuccessMessage('Account created successfully in Firebase Authentication and Firestore.');
           setCreateErrorMessage('');
           setSuccessModalVisible(true);
-          Alert.alert('Success', 'Account created successfully.');
           fetchUsers();
           return;
         }
@@ -390,7 +389,6 @@ export default function AdminDashboard({ navigation }) {
         setSuccessMessage('Account created successfully in Firebase Authentication and Firestore.');
         setCreateErrorMessage('');
         setSuccessModalVisible(true);
-        Alert.alert('Success', 'Account created successfully.');
         fetchUsers();
       } finally {
         await signOutSecondary(secondaryAuth).catch(() => {});
@@ -510,7 +508,6 @@ export default function AdminDashboard({ navigation }) {
           </TouchableOpacity>
           <View style={styles.headerText}>
             <Text style={styles.title}>Admin Dashboard</Text>
-            <Text style={styles.subtitle}>Platform overview and KPIs</Text>
           </View>
         </View>
 
@@ -546,9 +543,30 @@ export default function AdminDashboard({ navigation }) {
 
               {showCreate && (
                 <View style={{ marginTop: 8 }}>
-                  <TextInput placeholder="Full name" value={displayName} onChangeText={setDisplayName} style={styles.input} />
-                  <TextInput placeholder="Email" value={email} onChangeText={setEmail} style={styles.input} keyboardType="email-address" autoCapitalize="none" />
-                  <TextInput placeholder="Temporary password" value={password} onChangeText={setPassword} style={styles.input} secureTextEntry />
+                  <TextInput
+                    placeholder="Full name"
+                    placeholderTextColor="#5d7291"
+                    value={displayName}
+                    onChangeText={setDisplayName}
+                    style={styles.input}
+                  />
+                  <TextInput
+                    placeholder="Email"
+                    placeholderTextColor="#5d7291"
+                    value={email}
+                    onChangeText={setEmail}
+                    style={styles.input}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                  <TextInput
+                    placeholder="Temporary password"
+                    placeholderTextColor="#5d7291"
+                    value={password}
+                    onChangeText={setPassword}
+                    style={styles.input}
+                    secureTextEntry
+                  />
                   <View style={{ marginVertical: 8 }}>
                     <Text style={{ marginBottom: 6 }}>Role</Text>
                     <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -575,6 +593,7 @@ export default function AdminDashboard({ navigation }) {
                 <View style={styles.searchRow}>
                   <TextInput
                     placeholder="Search name or email"
+                    placeholderTextColor="#5d7291"
                     value={searchText}
                     onChangeText={(t) => { setSearchText(t); setCurrentPage(1); }}
                     style={[styles.input, styles.searchInput]}
@@ -830,7 +849,15 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  input: { borderWidth: 1, borderColor: '#e6eaf8', padding: 8, borderRadius: 6, marginBottom: 8, backgroundColor: '#fff' },
+  input: {
+    borderWidth: 1,
+    borderColor: '#e6eaf8',
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 8,
+    backgroundColor: '#fff',
+    color: '#243256',
+  },
   roleButton: { padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#e6eaf8', backgroundColor: '#fff' },
   roleActive: { backgroundColor: '#e6f0ff', borderColor: '#9fc3ff' },
   userCard: {

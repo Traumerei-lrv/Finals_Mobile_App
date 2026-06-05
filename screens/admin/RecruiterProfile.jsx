@@ -244,6 +244,8 @@ const CompanyAccountProfileScreen = ({ navigation }) => {
         {/* Account Control Section */}
         <View style={styles.controlCard}>
            <Text style={styles.controlHeader}>Account Control</Text>
+           <ControlLink icon="pencil-outline" label="Company Branding" />
+           <ControlLink icon="credit-card-outlirene" label="Billing & Subscription" />
            <ControlLink icon="shield-check-outline" label="Privacy & Security" />
            <ControlLink icon="logout" label="Log Out" isLast onPress={() => setLogoutModalVisible(true)} />
            
@@ -646,7 +648,7 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
   },
   controlCard: {
-    backgroundColor: '#001d3d',
+    backgroundColor: '#ffffff',
     marginHorizontal: 16,
     borderRadius: 12,
     padding: 24,

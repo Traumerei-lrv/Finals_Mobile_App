@@ -13,7 +13,6 @@ import {
   clearSavedJobs,
   getSavedJobs,
   removeSavedJob,
-  updateSavedJob,
 } from '../utils/storage';
 
 const COLORS = {
@@ -46,24 +45,6 @@ export default function SavedJobsScreen({ navigation }) {
 
   const savedCount = useMemo(() => savedJobs.length, [savedJobs]);
 
-  const handleUpdateSavedJobStatus = async (jobId) => {
-    const currentJob = savedJobs.find((item) => item.id === jobId);
-
-    if (!currentJob) {
-      return;
-    }
-
-    const nextStatus =
-      currentJob.status === 'Saved'
-        ? 'Applied'
-        : currentJob.status === 'Applied'
-          ? 'Interviewing'
-          : 'Saved';
-
-    const nextSavedJobs = await updateSavedJob(jobId, { status: nextStatus });
-    setSavedJobs(nextSavedJobs);
-  };
-
   const handleRemoveSavedJob = async (jobId) => {
     const nextSavedJobs = await removeSavedJob(jobId);
     setSavedJobs(nextSavedJobs);
@@ -92,7 +73,12 @@ export default function SavedJobsScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {savedJobs.length ? (
           savedJobs.map((job) => (
-            <View key={job.id} style={styles.card}>
+            <TouchableOpacity
+              key={job.id}
+              style={styles.card}
+              activeOpacity={0.9}
+              onPress={() => navigation.navigate('JobDetails', { job })}
+            >
               <View style={styles.cardTopRow}>
                 <View style={[styles.iconBox, { backgroundColor: job.color || COLORS.primary }]}>
                   <MaterialCommunityIcons name={job.icon || 'bookmark-outline'} size={20} color={COLORS.white} />
@@ -105,20 +91,18 @@ export default function SavedJobsScreen({ navigation }) {
               </View>
 
               <View style={styles.statusRow}>
-                <View style={styles.statusPill}>
-                  <Text style={styles.statusText}>{job.status}</Text>
-                </View>
-                <TouchableOpacity style={styles.actionButton} onPress={() => handleUpdateSavedJobStatus(job.id)}>
-                  <Text style={styles.actionText}>Update Status</Text>
-                </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.actionButton, styles.deleteButton]}
-                  onPress={() => handleRemoveSavedJob(job.id)}
+                  style={styles.removeButton}
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    void handleRemoveSavedJob(job.id);
+                  }}
                 >
-                  <Text style={[styles.actionText, styles.deleteText]}>Delete</Text>
+                  <MaterialCommunityIcons name="close" size={16} color="#B42318" />
+                  <Text style={styles.removeText}>Remove</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </TouchableOpacity>
           ))
         ) : (
           <View style={styles.emptyState}>
@@ -210,33 +194,20 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
-  statusPill: {
-    backgroundColor: '#E2E7F9',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  statusText: {
-    color: COLORS.primary,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  actionButton: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  deleteButton: {
+  removeButton: {
     backgroundColor: '#FDE8E8',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginLeft: 'auto',
   },
-  actionText: {
-    color: COLORS.white,
+  removeText: {
+    color: '#B42318',
     fontSize: 11,
     fontWeight: '700',
-  },
-  deleteText: {
-    color: '#B42318',
   },
   emptyState: {
     backgroundColor: COLORS.white,
