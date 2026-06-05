@@ -82,6 +82,7 @@ export default function ResumeSettingsScreen({ navigation }) {
           <TextInput
             style={styles.input}
             value={settings.resumeName}
+            placeholderTextColor={COLORS.secondary}
             onChangeText={(text) => handleChange('resumeName', text)}
           />
 
@@ -89,6 +90,7 @@ export default function ResumeSettingsScreen({ navigation }) {
           <TextInput
             style={styles.input}
             value={settings.resumeUpdatedAt}
+            placeholderTextColor={COLORS.secondary}
             onChangeText={(text) => handleChange('resumeUpdatedAt', text)}
           />
 
@@ -96,6 +98,7 @@ export default function ResumeSettingsScreen({ navigation }) {
           <TextInput
             style={styles.input}
             value={settings.resumeSize}
+            placeholderTextColor={COLORS.secondary}
             onChangeText={(text) => handleChange('resumeSize', text)}
           />
         </View>
@@ -131,6 +134,7 @@ export default function ResumeSettingsScreen({ navigation }) {
             <TextInput
               style={styles.input}
               value={item.url}
+              placeholderTextColor={COLORS.secondary}
               onChangeText={(text) => handlePortfolioChange(item.id, text)}
               autoCapitalize="none"
             />

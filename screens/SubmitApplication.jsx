@@ -180,6 +180,7 @@ const SubmitApplicationScreen = ({ navigation, route }) => {
               style={styles.input}
               value={formData.resumeUrl}
               placeholder="Paste Google Drive link of the resume"
+              placeholderTextColor={COLORS.secondary}
               autoCapitalize="none"
               onChangeText={(text) => setFormData({ ...formData, resumeUrl: text })}
             />
@@ -200,6 +201,7 @@ const SubmitApplicationScreen = ({ navigation, route }) => {
               style={styles.input}
               value={formData.fullName}
               placeholder="Your full name"
+              placeholderTextColor={COLORS.secondary}
               onChangeText={(text) => setFormData({ ...formData, fullName: text })}
             />
           </View>
@@ -212,6 +214,7 @@ const SubmitApplicationScreen = ({ navigation, route }) => {
               keyboardType="email-address"
               autoCapitalize="none"
               placeholder="your.email@example.com"
+              placeholderTextColor={COLORS.secondary}
               onChangeText={(text) => setFormData({ ...formData, email: text })}
             />
           </View>
@@ -223,6 +226,7 @@ const SubmitApplicationScreen = ({ navigation, route }) => {
               value={formData.phoneNumber}
               keyboardType="phone-pad"
               placeholder="+1 (555) 000-0000"
+              placeholderTextColor={COLORS.secondary}
               onChangeText={(text) => setFormData({ ...formData, phoneNumber: text })}
             />
           </View>
@@ -237,6 +241,7 @@ const SubmitApplicationScreen = ({ navigation, route }) => {
               multiline
               numberOfLines={4}
               placeholder="Tell us about your experience and motivation..."
+              placeholderTextColor={COLORS.secondary}
               value={formData.screening1}
               onChangeText={(text) => setFormData({ ...formData, screening1: text })}
             />
@@ -247,6 +252,7 @@ const SubmitApplicationScreen = ({ navigation, route }) => {
             <TextInput
               style={styles.input}
               placeholder="e.g., 2 weeks, Immediate"
+              placeholderTextColor={COLORS.secondary}
               value={formData.noticePeriod}
               onChangeText={(text) => setFormData({ ...formData, noticePeriod: text })}
             />

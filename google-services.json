@@ -1,0 +1,91 @@
+{
+  "project_info": {
+    "project_number": "139373810157",
+    "firebase_url": "https://realtime-database-cd1d6-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "realtime-database-cd1d6",
+    "storage_bucket": "realtime-database-cd1d6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:139373810157:android:388af797903b77c3d157e4",
+        "android_client_info": {
+          "package_name": "com.careergo.mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "139373810157-5gjjhuadglggqbsg9rt4va98h0ggq6lo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.careergo.mobile",
+            "certificate_hash": "4fb36dfe9189242912bf575287dc0abc3400393d"
+          }
+        },
+        {
+          "client_id": "139373810157-fr8jg5aps9mvv4fun637rdse600h53ui.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAHy8rbrOjb4T-LkdFEDPKBsVZO_owQs78"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "139373810157-fr8jg5aps9mvv4fun637rdse600h53ui.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "139373810157-b0cdkq0avp21fg2s3f7dm78j4c0cq8sl.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.careergo.mobile"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:139373810157:android:3ac3c5efec822d13d157e4",
+        "android_client_info": {
+          "package_name": "com.example.travelblog"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "139373810157-fr8jg5aps9mvv4fun637rdse600h53ui.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAHy8rbrOjb4T-LkdFEDPKBsVZO_owQs78"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "139373810157-fr8jg5aps9mvv4fun637rdse600h53ui.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "139373810157-b0cdkq0avp21fg2s3f7dm78j4c0cq8sl.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.careergo.mobile"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

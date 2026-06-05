@@ -42,6 +42,11 @@ const COLORS = {
 };
 
 const APP_LOGO = require('../../logo/app_logo_1-removebg-preview.png');
+const GOOGLE_CLIENT_IDS = {
+  web: '139373810157-fr8jg5aps9mvv4fun637rdse600h53ui.apps.googleusercontent.com',
+  android: '139373810157-5gjjhuadglggqbsg9rt4va98h0ggq6lo.apps.googleusercontent.com',
+  ios: '139373810157-b0cdkq0avp21fg2s3f7dm78j4c0cq8sl.apps.googleusercontent.com',
+};
 
 const ReactNativeLogin = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -50,7 +55,10 @@ const ReactNativeLogin = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
-  const isExpoGo = Boolean(Constants.expoGoConfig);
+  const isExpoGo = Constants.executionEnvironment === 'storeClient';
+  const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || GOOGLE_CLIENT_IDS.web;
+  const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || GOOGLE_CLIENT_IDS.android;
+  const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || GOOGLE_CLIENT_IDS.ios;
   // Expo Go does not bundle the native Google Sign-In module, so load it only in real native builds.
   const nativeGoogleSignIn =
     Platform.OS === 'web' || isExpoGo
@@ -108,24 +116,39 @@ const ReactNativeLogin = ({ navigation }) => {
   };
 
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    iosClientId,
+    androidClientId,
+    webClientId,
     selectAccount: true,
   });
+  const googleHelperText =
+    Platform.OS !== 'web' && isExpoGo
+      ? 'Google sign-in cannot run inside Expo Go. Open your installed Android build instead.'
+      : Platform.OS === 'web' && !request
+        ? 'Google sign-in is still loading. If this never becomes ready, restart Expo after updating the Google client IDs.'
+        : '';
 
   useEffect(() => {
     if (Platform.OS === 'web' || !GoogleSignin) {
       return;
     }
 
+    console.log('Google Sign-In configure start', {
+      platform: Platform.OS,
+      expoGo: isExpoGo,
+      nativeModuleAvailable: !!GoogleSignin,
+      hasWebClientId: !!webClientId,
+    });
+
     GoogleSignin.configure({
-      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-      iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-      offlineAccess: false,
+      webClientId,
+      iosClientId,
+      offlineAccess: true,
       scopes: ['profile', 'email'],
     });
-  }, []);
+
+    console.log('Google Sign-In configure success');
+  }, [GoogleSignin, iosClientId, isExpoGo, webClientId]);
 
   const handleSignIn = async () => {
     setError('');
@@ -161,21 +184,18 @@ const ReactNativeLogin = ({ navigation }) => {
 
   const handleGoogleSignIn = async () => {
     setError('');
+    console.log('Google Sign-In start', {
+      platform: Platform.OS,
+      expoGo: isExpoGo,
+      nativeModuleAvailable: !!GoogleSignin,
+    });
 
-    if (
-      !process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID &&
-      !process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID &&
-      !process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
-    ) {
+    if (!iosClientId && !androidClientId && !webClientId) {
       setError('Missing Google OAuth client IDs. Add EXPO_PUBLIC_GOOGLE_*_CLIENT_ID in your environment.');
       return;
     }
 
-    const providedClientId =
-      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-      process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
-      process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
-      '';
+    const providedClientId = webClientId || androidClientId || iosClientId || '';
     const oauthProjectNumber = providedClientId.split('-')[0];
     if (oauthProjectNumber && oauthProjectNumber !== firebaseProjectNumber) {
       setError(
@@ -189,9 +209,15 @@ const ReactNativeLogin = ({ navigation }) => {
       return;
     }
 
+    if (Platform.OS !== 'web' && isExpoGo) {
+      setError('Google sign-in cannot run inside Expo Go. Open your installed Android build instead.');
+      return;
+    }
+
     try {
       setGoogleLoading(true);
-      if (Platform.OS === 'web' || !GoogleSignin) {
+      if (Platform.OS === 'web') {
+        console.log('Google Sign-In using web auth session');
         const result = await promptAsync({ showInRecents: true });
         if (result.type === 'dismiss' || result.type === 'cancel') {
           setGoogleLoading(false);
@@ -199,35 +225,59 @@ const ReactNativeLogin = ({ navigation }) => {
         return;
       }
 
+      if (!GoogleSignin) {
+        throw new Error('Google Sign-In native module is unavailable. Open the Android development build or APK instead of Expo Go.');
+      }
+
+      console.log('Google Sign-In checking Play Services');
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      console.log('Google Sign-In Play Services available');
+
       const nativeResult = await GoogleSignin.signIn();
+      console.log('Google Sign-In native response', {
+        type: nativeResult?.type,
+        hasData: !!nativeResult?.data,
+      });
 
       if (nativeResult.type === 'cancelled') {
+        console.log('User cancelled Google Sign-In');
         setGoogleLoading(false);
         return;
       }
 
-      const idToken = nativeResult.data?.idToken;
+      const idToken = nativeResult.data?.idToken || nativeResult?.idToken;
+      console.log('Google idToken exists:', !!nativeResult.data?.idToken);
       if (!idToken) {
         throw new Error('Google Sign-In did not return an ID token. Check that the web client ID is configured correctly.');
       }
 
+      console.log('Google Sign-In creating Firebase credential');
       const credential = GoogleAuthProvider.credential(idToken);
       const result = await signInWithCredential(auth, credential);
+      console.log('Google Sign-In Firebase auth success', { uid: result.user?.uid });
       await validateSignedInUser(result.user);
+      console.log('Google Sign-In final auth success');
       setGoogleLoading(false);
     } catch (promptError) {
-      console.error('Google prompt error', promptError);
+      console.error('Google Sign-In error', promptError);
       const message = getGoogleSignInErrorMessage(promptError);
       if (message) {
         setError(message);
       }
+      console.log('Google Sign-In final auth failure', {
+        code: promptError?.code,
+        message: promptError?.message,
+      });
       setGoogleLoading(false);
     }
   };
 
   useEffect(() => {
     const signInWithGoogleCredential = async () => {
+      if (Platform.OS !== 'web') {
+        return;
+      }
+
       if (!response || response.type !== 'success') {
         if (response?.type === 'error') {
           const responseError =
@@ -243,6 +293,9 @@ const ReactNativeLogin = ({ navigation }) => {
       }
 
       const idToken = response.params?.id_token ?? response.authentication?.idToken;
+      console.log('Google web auth response received', {
+        hasIdToken: !!idToken,
+      });
 
       if (!idToken) {
         setError('Google Sign-In failed: no ID token returned.');
@@ -253,6 +306,7 @@ const ReactNativeLogin = ({ navigation }) => {
       try {
         const credential = GoogleAuthProvider.credential(idToken);
         const result = await signInWithCredential(auth, credential);
+        console.log('Google web Firebase auth success', { uid: result.user?.uid });
         await validateSignedInUser(result.user);
       } catch (authError) {
         console.error('Google sign in error', authError);
@@ -344,9 +398,12 @@ const ReactNativeLogin = ({ navigation }) => {
             {/* Social Buttons */}
             <View style={styles.socialRow}>
               <TouchableOpacity
-                style={styles.socialButton}
+                style={[
+                  styles.socialButton,
+                  !googleLoading && googleHelperText ? { opacity: 0.72 } : null,
+                ]}
                 onPress={handleGoogleSignIn}
-                disabled={(Platform.OS === 'web' && !request) || googleLoading}
+                disabled={googleLoading}
               >
                 <Image
                   source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/512px-Google_%22G%22_Logo.svg.png' }}
@@ -355,6 +412,8 @@ const ReactNativeLogin = ({ navigation }) => {
                 <Text style={styles.socialText}>{googleLoading ? 'Signing in...' : 'Google'}</Text>
               </TouchableOpacity>
             </View>
+
+            {googleHelperText ? <Text style={styles.helperText}>{googleHelperText}</Text> : null}
 
             {/* Sign Up Link */}
             <View style={styles.footer}>

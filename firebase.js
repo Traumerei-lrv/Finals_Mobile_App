@@ -6,7 +6,7 @@ import { getStorage } from 'firebase/storage';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const FIREBASE_API_KEY = 'AIzaSyD0i3TfA1QTL_h1GpZeI67tt8H3vrbDiL8'.trim();
+const FIREBASE_API_KEY = 'AIzaSyAHy8rbrOjb4T-LkdFEDPKBsVZO_owQs78'.trim();
 
 export const firebaseConfig = {
   apiKey: FIREBASE_API_KEY,

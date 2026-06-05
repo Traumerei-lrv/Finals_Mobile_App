@@ -119,14 +119,9 @@ export default function AdminProfile({ navigation }) {
           <InfoRow icon="email-outline" label="Email" value={adminEmail} />
           <InfoRow icon="identifier" label="User ID" value={user?.uid || 'Not available'} />
           <InfoRow icon="calendar-month-outline" label="Joined" value={joinedDate} />
-          <InfoRow icon="shield-account-outline" label="Access" value="Full admin access" isLast />
         </View>
 
-        <View style={styles.infoCard}>
-          <Text style={styles.sectionTitle}>Session</Text>
-          <Text style={styles.sectionBody}>
-            This account manages platform users, jobs, and reports. Use logout here when you want to safely end the admin session on this device.
-          </Text>
+        <View style={styles.infoCard}>  
           <TouchableOpacity style={styles.logoutButton} onPress={() => setLogoutModalVisible(true)}>
             <MaterialCommunityIcons name="logout" size={18} color={COLORS.white} />
             <Text style={styles.logoutButtonText}>Log Out</Text>
