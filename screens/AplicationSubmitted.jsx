@@ -70,7 +70,7 @@ const SuccessScreen = () => {
 
         {/* What Happens Next Card */}
         <View style={styles.nextStepsCard}>
-          <Text style={styles.cardTitle}>What happens next?</Text>
+          <Text style={styles.cardTitle}>What happens next</Text>
           
           <NextStepItem 
             number="1"

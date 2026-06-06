@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  RefreshControl,
   StyleSheet,
   View,
   Text,
@@ -52,6 +53,8 @@ const MyApplicationsScreen = ({ navigation, route }) => {
   const [submittedApplications, setSubmittedApplications] = useState([]);
   const [pendingArchiveIds, setPendingArchiveIds] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const tabs = ['All', 'Active', 'Interviews', 'Archive'];
 
@@ -66,7 +69,7 @@ const MyApplicationsScreen = ({ navigation, route }) => {
     });
 
     return unsubscribe;
-  }, []);
+  }, [refreshKey]);
 
   useEffect(() => {
     if (route?.params?.initialTab === 'Archive') {
@@ -105,6 +108,16 @@ const MyApplicationsScreen = ({ navigation, route }) => {
     }
   };
 
+  const handleRefresh = () => {
+    if (refreshing) {
+      return;
+    }
+
+    setRefreshing(true);
+    setRefreshKey((current) => current + 1);
+    setTimeout(() => setRefreshing(false), 600);
+  };
+
   if (selectedJob) {
     return (
       <JobDetailView
@@ -130,9 +143,7 @@ const MyApplicationsScreen = ({ navigation, route }) => {
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Applications</Text>
-        <TouchableOpacity>
-          <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
-        </TouchableOpacity>
+        <View style={{ width: 24 }} />
       </View>
 
       {/* Tabs */}
@@ -153,6 +164,14 @@ const MyApplicationsScreen = ({ navigation, route }) => {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
       >
         <View style={styles.applicationList}>
           {filteredApps.map((app) => (

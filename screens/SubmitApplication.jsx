@@ -235,7 +235,7 @@ const SubmitApplicationScreen = ({ navigation, route }) => {
           <Text style={styles.centeredSectionTitle}>Screening Questions</Text>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Why are you a good fit for this role? <Text style={styles.required}>*</Text></Text>
+            <Text style={styles.label}>Why are you a good fit for this role <Text style={styles.required}>*</Text></Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               multiline
@@ -248,7 +248,7 @@ const SubmitApplicationScreen = ({ navigation, route }) => {
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>What is your notice period? <Text style={styles.required}>*</Text></Text>
+            <Text style={styles.label}>What is your notice period <Text style={styles.required}>*</Text></Text>
             <TextInput
               style={styles.input}
               placeholder="e.g., 2 weeks, Immediate"

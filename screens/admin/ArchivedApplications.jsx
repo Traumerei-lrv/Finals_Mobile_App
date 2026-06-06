@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -28,6 +29,8 @@ export default function ArchivedApplicationsScreen({ navigation }) {
   const { isAdmin } = useAuthContext();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [applications, setApplications] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const recruiterId = auth.currentUser?.uid ?? null;
@@ -39,7 +42,7 @@ export default function ArchivedApplicationsScreen({ navigation }) {
     });
 
     return unsubscribe;
-  }, []);
+  }, [refreshKey]);
 
   const archivedApplications = useMemo(
     () => applications.filter((application) => application.recruiterArchived),
@@ -55,6 +58,16 @@ export default function ArchivedApplicationsScreen({ navigation }) {
     }
 
     navigation.navigate(item.route, item.params);
+  };
+
+  const handleRefresh = () => {
+    if (refreshing) {
+      return;
+    }
+
+    setRefreshing(true);
+    setRefreshKey((current) => current + 1);
+    setTimeout(() => setRefreshing(false), 600);
   };
 
   return (
@@ -76,7 +89,18 @@ export default function ArchivedApplicationsScreen({ navigation }) {
         <View style={styles.headerRightSpacer} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
+      >
         <View style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>Archived Records</Text>
           <Text style={styles.summaryValue}>{archivedApplications.length}</Text>

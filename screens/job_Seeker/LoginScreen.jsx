@@ -18,13 +18,13 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import {
   GoogleAuthProvider,
-  signOut,
   signInWithCredential,
   signInWithEmailAndPassword,
 } from 'firebase/auth';
 import { auth } from '../../firebase';
 import { db } from '../../firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { clearStaleNativeGoogleSession, signOutFromAllProviders } from '../../utils/authProviders';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -79,10 +79,7 @@ const ReactNativeLogin = ({ navigation }) => {
     const profile = profileSnap.exists() ? profileSnap.data() : null;
 
     if (profile?.active === false) {
-      await signOut(auth);
-      if (Platform.OS !== 'web') {
-        await GoogleSignin?.signOut?.().catch(() => {});
-      }
+      await signOutFromAllProviders();
       throw new Error('This account has been deactivated. Please contact an administrator.');
     }
   };
@@ -232,6 +229,10 @@ const ReactNativeLogin = ({ navigation }) => {
       console.log('Google Sign-In checking Play Services');
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       console.log('Google Sign-In Play Services available');
+
+      if (!auth.currentUser) {
+        await clearStaleNativeGoogleSession();
+      }
 
       const nativeResult = await GoogleSignin.signIn();
       console.log('Google Sign-In native response', {
@@ -417,7 +418,7 @@ const ReactNativeLogin = ({ navigation }) => {
 
             {/* Sign Up Link */}
             <View style={styles.footer}>
-              <Text style={styles.footerText}>Don't have an account yet? </Text>
+              <Text style={styles.footerText}>Don't have an account yet </Text>
               <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
                 <Text style={styles.signUpText}>Sign Up</Text>
               </TouchableOpacity>

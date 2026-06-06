@@ -35,6 +35,7 @@ const ReactNativeSignUp = ({navigation}) => {
   const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [contactPerson, setContactPerson] = useState('');
+  const [recruiterLocation, setRecruiterLocation] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -48,7 +49,14 @@ const ReactNativeSignUp = ({navigation}) => {
     const isRecruiter = role === 'recruiter';
     const effectiveName = isRecruiter ? contactPerson.trim() : fullName.trim();
 
-    if ((!isRecruiter && !fullName.trim()) || !email || !password || (isRecruiter && !companyName.trim()) || (isRecruiter && !contactPerson.trim())) {
+    if (
+      (!isRecruiter && !fullName.trim()) ||
+      !email ||
+      !password ||
+      (isRecruiter && !companyName.trim()) ||
+      (isRecruiter && !contactPerson.trim()) ||
+      (isRecruiter && !recruiterLocation.trim())
+    ) {
       setError('Please complete all fields.');
       return;
     }
@@ -86,6 +94,7 @@ const ReactNativeSignUp = ({navigation}) => {
                 fullName: effectiveName,
                 email: email.trim().toLowerCase(),
                 company: companyName.trim(),
+                location: recruiterLocation.trim(),
                 verified: false,
                 contactPerson: contactPerson.trim(),
                 createdAt: serverTimestamp(),
@@ -194,6 +203,16 @@ const ReactNativeSignUp = ({navigation}) => {
                     onChangeText={setContactPerson}
                   />
                 </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Company Location</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. New York, NY"
+                    placeholderTextColor={COLORS.secondary}
+                    value={recruiterLocation}
+                    onChangeText={setRecruiterLocation}
+                  />
+                </View>
               </>
             ) : (
               <View style={styles.inputGroup}>
@@ -272,7 +291,7 @@ const ReactNativeSignUp = ({navigation}) => {
 
             {/* Footer */}
             <View style={styles.footer}>
-              <Text style={styles.footerText}>Already have an account? </Text>
+              <Text style={styles.footerText}>Already have an account </Text>
               <TouchableOpacity onPress={() => navigation.navigate('Login')}>
                 <Text style={styles.loginText}>Login</Text>
               </TouchableOpacity>

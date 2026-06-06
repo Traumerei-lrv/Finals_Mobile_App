@@ -34,13 +34,41 @@ export default function ApplicantReviewScreen({ navigation, route }) {
     String(application?.statusType ?? 'applied').toLowerCase(),
   );
 
+  const normalizedReviewStatusType = useMemo(
+    () => String(reviewStatusType ?? 'applied').toLowerCase(),
+    [reviewStatusType],
+  );
+  const isDeclined = normalizedReviewStatusType === 'declined';
+  const isApproved = normalizedReviewStatusType === 'offer';
+  const canTakeDecision =
+    normalizedReviewStatusType === 'applied' ||
+    normalizedReviewStatusType === 'screened' ||
+    normalizedReviewStatusType === 'review';
+  const interviewDetails =
+    application?.interviewDetails && typeof application.interviewDetails === 'object'
+      ? application.interviewDetails
+      : null;
+
   const statusLabel = useMemo(() => {
-    const type = String(reviewStatusType ?? 'applied').toLowerCase();
-    if (type === 'screened' || type === 'review') return 'UNDER REVIEW';
-    if (type === 'offer') return 'APPROVED';
-    if (type === 'declined') return 'DECLINED';
+    if (normalizedReviewStatusType === 'screened' || normalizedReviewStatusType === 'review') return 'UNDER REVIEW';
+    if (normalizedReviewStatusType === 'offer') return 'APPROVED';
+    if (normalizedReviewStatusType === 'declined') return 'DECLINED';
     return 'APPLIED';
-  }, [reviewStatusType]);
+  }, [normalizedReviewStatusType]);
+
+  const statusBadgeStyle = useMemo(() => {
+    if (isApproved) {
+      return [styles.badge, styles.badgeApproved];
+    }
+    if (isDeclined) {
+      return [styles.badge, styles.badgeDeclined];
+    }
+    return [styles.badge];
+  }, [isApproved, isDeclined]);
+
+  useEffect(() => {
+    setReviewStatusType(String(application?.statusType ?? 'applied').toLowerCase());
+  }, [application?.id, application?.statusType]);
 
   if (!application) {
     return (
@@ -71,13 +99,17 @@ export default function ApplicantReviewScreen({ navigation, route }) {
   }, [application?.id, application?.statusType]);
 
   const handleApprove = () => {
+    if (!canTakeDecision) {
+      return;
+    }
+
     navigation.navigate('InterviewSchedule', {
       application,
       existingNote: note,
     });
   };
 
-  const handleDecline = async () => {
+  const handleDeclineConfirmed = async () => {
     try {
       await updateApplicationStatus({ applicationId: application.id, status: 'DECLINED', statusType: 'declined' });
       setReviewStatusType('declined');
@@ -86,6 +118,30 @@ export default function ApplicantReviewScreen({ navigation, route }) {
       console.error('Decline failed', error);
       Alert.alert('Action failed', 'Unable to decline this application right now.');
     }
+  };
+
+  const handleDecline = () => {
+    if (!canTakeDecision) {
+      return;
+    }
+
+    Alert.alert(
+      'Decline applicant',
+      'This is a final decision. Once you decline this applicant, you will not be able to approve them later.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Confirm Decline',
+          style: 'destructive',
+          onPress: () => {
+            handleDeclineConfirmed();
+          },
+        },
+      ],
+    );
   };
 
   const handleRemoveToArchive = async () => {
@@ -143,13 +199,40 @@ export default function ApplicantReviewScreen({ navigation, route }) {
         <View style={styles.card}>
           <View style={styles.rowBetween}>
             <Text style={styles.name}>{application.applicantName}</Text>
-            <View style={styles.badge}><Text style={styles.badgeText}>{statusLabel}</Text></View>
+            <View style={statusBadgeStyle}><Text style={styles.badgeText}>{statusLabel}</Text></View>
           </View>
           <Text style={styles.role}>{application.role}</Text>
           <Text style={styles.meta}>{application.applicantEmail || 'No email provided'}</Text>
           <Text style={styles.meta}>{application.applicantPhone || 'No phone provided'}</Text>
           <Text style={styles.meta}>Job: {application.company} • {application.location}</Text>
         </View>
+
+        {isApproved ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Interview Details</Text>
+            <Text style={styles.body}>
+              Type: {interviewDetails?.interviewType || 'Not specified'}
+            </Text>
+            <Text style={styles.body}>
+              Format: {interviewDetails?.meetingFormat || 'Not specified'}
+            </Text>
+            <Text style={styles.body}>
+              Date: {interviewDetails?.date || 'Not scheduled'}
+            </Text>
+            <Text style={styles.body}>
+              Time: {interviewDetails?.time || 'Not scheduled'}
+            </Text>
+            <Text style={styles.body}>
+              Timezone: {interviewDetails?.timezone || 'Not specified'}
+            </Text>
+            <Text style={styles.body}>
+              Meeting Link / Location: {interviewDetails?.location || 'Not provided'}
+            </Text>
+            <Text style={[styles.body, styles.bodyNoMargin]}>
+              Candidate Instructions: {interviewDetails?.instructions || 'No instructions provided.'}
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Screening Answer</Text>
@@ -184,9 +267,10 @@ export default function ApplicantReviewScreen({ navigation, route }) {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Internal Note</Text>
           <TextInput
-            style={styles.noteInput}
+            style={[styles.noteInput, !canTakeDecision && styles.noteInputDisabled]}
             multiline
-            placeholder="Add private note"
+            editable={canTakeDecision}
+            placeholder={canTakeDecision ? 'Add private note' : 'Private note is read-only after a final decision'}
             placeholderTextColor={COLORS.secondary}
             value={note}
             onChangeText={setNote}
@@ -194,15 +278,19 @@ export default function ApplicantReviewScreen({ navigation, route }) {
         </View>
 
         <View style={styles.actionsRow}>
-          <TouchableOpacity style={styles.approveBtn} onPress={handleApprove}>
-            <Text style={styles.actionText}>Approve & Schedule</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.declineBtn} onPress={handleDecline}>
-            <Text style={styles.declineText}>Decline</Text>
-          </TouchableOpacity>
-          {String(reviewStatusType ?? '').toLowerCase() === 'declined' ? (
+          {canTakeDecision ? (
+            <>
+              <TouchableOpacity style={styles.approveBtn} onPress={handleApprove}>
+                <Text style={styles.actionText}>Approve & Schedule</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.declineBtn} onPress={handleDecline}>
+                <Text style={styles.declineText}>Decline</Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
+          {isDeclined ? (
             <TouchableOpacity style={styles.removeBtn} onPress={handleRemoveToArchive}>
-              <Text style={styles.removeText}>Remove</Text>
+              <Text style={styles.removeText}>Remove to Archive</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -228,13 +316,17 @@ const styles = StyleSheet.create({
   role: { fontSize: 15, color: COLORS.primary, fontWeight: '700', marginTop: 4, marginBottom: 6 },
   meta: { fontSize: 13, color: COLORS.secondary, marginBottom: 4 },
   badge: { backgroundColor: '#E8F0FE', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  badgeApproved: { backgroundColor: '#E8F5E9' },
+  badgeDeclined: { backgroundColor: '#FEE2E2' },
   badgeText: { fontSize: 10, fontWeight: '800', color: COLORS.primary },
   sectionTitle: { fontSize: 14, fontWeight: '800', color: COLORS.primary, marginBottom: 6 },
   body: { fontSize: 14, color: COLORS.secondary, lineHeight: 20, marginBottom: 10 },
+  bodyNoMargin: { marginBottom: 0 },
   secondaryBtn: { height: 42, borderRadius: 8, borderWidth: 1, borderColor: COLORS.primary, justifyContent: 'center', alignItems: 'center' },
   secondaryBtnDisabled: { opacity: 0.55 },
   secondaryBtnText: { fontSize: 14, fontWeight: '700', color: COLORS.primary },
   noteInput: { minHeight: 90, borderWidth: 1, borderColor: COLORS.outline, borderRadius: 8, padding: 10, color: COLORS.primary, textAlignVertical: 'top', backgroundColor: COLORS.white },
+  noteInputDisabled: { backgroundColor: '#F8FAFC', color: COLORS.secondary },
   actionsRow: { gap: 10, marginTop: 4 },
   approveBtn: { height: 46, backgroundColor: COLORS.success, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   declineBtn: { height: 46, backgroundColor: '#FEE2E2', borderRadius: 8, borderWidth: 1, borderColor: '#FECACA', justifyContent: 'center', alignItems: 'center' },

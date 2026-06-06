@@ -279,7 +279,7 @@ export default function InterviewScheduleScreen({ navigation, route }) {
             style={styles.textArea}
             multiline
             numberOfLines={4}
-            placeholder="What should the applicant prepare?"
+            placeholder="What should the applicant prepare"
             placeholderTextColor={COLORS.secondary}
           />
         </View>

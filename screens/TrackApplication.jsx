@@ -220,7 +220,7 @@ const TrackApplicationScreen = ({ navigation, route }) => {
 
         {/* Resource Banner */}
         <View style={styles.resourceBanner}>
-          <Text style={styles.resourceTitle}>Preparing for your interview?</Text>
+          <Text style={styles.resourceTitle}>Preparing for your interview</Text>
           <Text style={styles.resourceDescription}>
             Read our guide on Google's design interview process.
           </Text>

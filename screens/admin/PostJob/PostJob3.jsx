@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
+  ActivityIndicator,
   StyleSheet,
   View,
   Text,
@@ -35,8 +36,13 @@ const PostJobStep3Screen = ({ navigation, route }) => {
   const about = draft?.about?.trim() || `${company} is hiring a ${role}.`;
   const skills = Array.isArray(draft?.skills) ? draft.skills.filter(Boolean) : [];
   const qualifications = Array.isArray(draft?.qualifications) ? draft.qualifications.filter(Boolean) : [];
+  const [isPosting, setIsPosting] = useState(false);
 
   const handlePostJob = async () => {
+    if (isPosting) {
+      return;
+    }
+
     const currentUser = auth.currentUser;
 
     if (!currentUser?.uid) {
@@ -45,12 +51,13 @@ const PostJobStep3Screen = ({ navigation, route }) => {
     }
 
     try {
+      setIsPosting(true);
       const jobId = await createRecruiterJobPosting({
         recruiterId: currentUser.uid,
         draft,
       });
 
-      navigation.navigate('PostJobSuccess', {
+      navigation.replace('PostJobSuccess', {
         postedJob: {
           id: jobId,
           role,
@@ -66,6 +73,8 @@ const PostJobStep3Screen = ({ navigation, route }) => {
     } catch (error) {
       console.error('Failed to post job', error);
       Alert.alert('Posting failed', 'Unable to post job right now. Please try again.');
+    } finally {
+      setIsPosting(false);
     }
   };
 
@@ -127,9 +136,22 @@ const PostJobStep3Screen = ({ navigation, route }) => {
         </View>
 
         <View style={styles.card}>
-          <TouchableOpacity style={styles.postButton} onPress={handlePostJob}>
-            <Text style={styles.postButtonText}>Post Job Now</Text>
-            <MaterialCommunityIcons name="rocket-launch-outline" size={20} color={COLORS.white} />
+          <TouchableOpacity
+            style={[styles.postButton, isPosting && styles.postButtonDisabled]}
+            onPress={handlePostJob}
+            disabled={isPosting}
+          >
+            {isPosting ? (
+              <>
+                <ActivityIndicator color={COLORS.white} />
+                <Text style={styles.postButtonText}>Posting...</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.postButtonText}>Post Job Now</Text>
+                <MaterialCommunityIcons name="rocket-launch-outline" size={20} color={COLORS.white} />
+              </>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -165,6 +187,7 @@ const styles = StyleSheet.create({
   rowText: { fontSize: 14, color: COLORS.primary, fontWeight: '600', flex: 1 },
   emptyText: { fontSize: 13, color: COLORS.secondary },
   postButton: { backgroundColor: '#001a33', height: 56, borderRadius: 8, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 },
+  postButtonDisabled: { opacity: 0.8 },
   postButtonText: { color: COLORS.white, fontSize: 16, fontWeight: '800' },
 });
 

@@ -34,6 +34,13 @@ const COLORS = {
   onSecondaryContainer: '#1a365d',
 };
 
+const CURRENCY_OPTIONS = [
+  { code: 'USD', symbol: '$', label: 'USD' },
+  { code: 'EUR', symbol: 'EUR', label: 'EUR' },
+  { code: 'GBP', symbol: 'GBP', label: 'GBP' },
+  { code: 'PHP', symbol: 'PHP', label: 'PHP' },
+];
+
 const PostJobScreen = ({ navigation }) => {
   const [workMode, setWorkMode] = useState('Hybrid');
   const [formData, setFormData] = useState({
@@ -41,23 +48,36 @@ const PostJobScreen = ({ navigation }) => {
     companyName: 'Velocity Corp',
     industry: 'Information Technology',
     location: 'New York, NY (or Global)',
+    salaryCurrency: 'USD',
     minSalary: '120000',
     maxSalary: '160000',
     description: '',
   });
+
+  const selectedCurrency =
+    CURRENCY_OPTIONS.find((option) => option.code === formData.salaryCurrency) ?? CURRENCY_OPTIONS[0];
+  const salaryPreview =
+    formData.minSalary.trim() && formData.maxSalary.trim()
+      ? `${selectedCurrency.symbol}${formData.minSalary.trim()} - ${selectedCurrency.symbol}${formData.maxSalary.trim()}`
+      : formData.minSalary.trim()
+        ? `${selectedCurrency.symbol}${formData.minSalary.trim()}+`
+        : formData.maxSalary.trim()
+          ? `Up to ${selectedCurrency.symbol}${formData.maxSalary.trim()}`
+          : 'Competitive';
 
   const draftPayload = {
     role: formData.jobTitle.trim() || 'Untitled Role',
     company: formData.companyName.trim() || 'Velocity Corp',
     location: formData.location.trim() || 'Remote',
     type: workMode,
+    salaryCurrency: formData.salaryCurrency,
     salary:
       formData.minSalary.trim() && formData.maxSalary.trim()
-        ? `$${formData.minSalary.trim()} - $${formData.maxSalary.trim()}`
+        ? `${selectedCurrency.symbol}${formData.minSalary.trim()} - ${selectedCurrency.symbol}${formData.maxSalary.trim()}`
         : formData.minSalary.trim()
-          ? `$${formData.minSalary.trim()}+`
+          ? `${selectedCurrency.symbol}${formData.minSalary.trim()}+`
           : formData.maxSalary.trim()
-            ? `Up to $${formData.maxSalary.trim()}`
+            ? `Up to ${selectedCurrency.symbol}${formData.maxSalary.trim()}`
             : 'Competitive',
     about: formData.description.trim(),
     industry: formData.industry.trim(),
@@ -73,9 +93,7 @@ const PostJobScreen = ({ navigation }) => {
           </TouchableOpacity>
           <Text style={styles.headerLogo}>Recruiter Hub</Text>
         </View>
-        <TouchableOpacity>
-          <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
-        </TouchableOpacity>
+        <View style={{ width: 24 }} />
       </View>
 
       <KeyboardAvoidingView
@@ -167,32 +185,54 @@ const PostJobScreen = ({ navigation }) => {
           {/* Salary Section */}
           <View style={styles.card}>
             <Text style={styles.label}>Salary Range (Annual)</Text>
+            <Text style={styles.helperText}>Choose the currency before entering the salary range.</Text>
+            <View style={styles.currencyOptionRow}>
+              {CURRENCY_OPTIONS.map((option) => {
+                const isActive = formData.salaryCurrency === option.code;
+                return (
+                  <TouchableOpacity
+                    key={option.code}
+                    style={[styles.currencyOptionButton, isActive && styles.currencyOptionButtonActive]}
+                    onPress={() => setFormData({ ...formData, salaryCurrency: option.code })}
+                  >
+                    <Text style={[styles.currencyOptionText, isActive && styles.currencyOptionTextActive]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
             <View style={styles.salaryRow}>
               <View style={styles.salaryInputGroup}>
-                <Text style={styles.salarySubLabel}>Min</Text>
-                <View style={styles.currencyInput}>
-                  <Text style={styles.currencySymbol}>$</Text>
-                  <TextInput
-                    style={styles.salaryTextInput}
-                    keyboardType="numeric"
-                    value={formData.minSalary}
-                    onChangeText={(text) => setFormData({ ...formData, minSalary: text })}
-                  />
+                <View style={styles.salaryHeaderRow}>
+                  <Text style={styles.salarySubLabel}>Min</Text>
+                  <Text style={styles.salaryCurrencyBadge}>{selectedCurrency.label}</Text>
                 </View>
+                <TextInput
+                  style={styles.salaryInput}
+                  keyboardType="numeric"
+                  placeholder="e.g. 120000"
+                  placeholderTextColor={COLORS.secondary}
+                  value={formData.minSalary}
+                  onChangeText={(text) => setFormData({ ...formData, minSalary: text.replace(/[^0-9]/g, '') })}
+                />
               </View>
               <View style={styles.salaryInputGroup}>
-                <Text style={styles.salarySubLabel}>Max</Text>
-                <View style={styles.currencyInput}>
-                  <Text style={styles.currencySymbol}>$</Text>
-                  <TextInput
-                    style={styles.salaryTextInput}
-                    keyboardType="numeric"
-                    value={formData.maxSalary}
-                    onChangeText={(text) => setFormData({ ...formData, maxSalary: text })}
-                  />
+                <View style={styles.salaryHeaderRow}>
+                  <Text style={styles.salarySubLabel}>Max</Text>
+                  <Text style={styles.salaryCurrencyBadge}>{selectedCurrency.label}</Text>
                 </View>
+                <TextInput
+                  style={styles.salaryInput}
+                  keyboardType="numeric"
+                  placeholder="e.g. 160000"
+                  placeholderTextColor={COLORS.secondary}
+                  value={formData.maxSalary}
+                  onChangeText={(text) => setFormData({ ...formData, maxSalary: text.replace(/[^0-9]/g, '') })}
+                />
               </View>
             </View>
+            <Text style={styles.salaryPreviewText}>Preview: {salaryPreview}</Text>
             
             {/* Range Slider Mockup */}
             <View style={styles.sliderContainer}>
@@ -201,8 +241,8 @@ const PostJobScreen = ({ navigation }) => {
               <View style={[styles.sliderThumb, { left: '50%' }]} />
             </View>
             <View style={styles.sliderLabels}>
-              <Text style={styles.sliderValueText}>$50k</Text>
-              <Text style={styles.sliderValueText}>$250k+</Text>
+              <Text style={styles.sliderValueText}>{selectedCurrency.symbol}50k</Text>
+              <Text style={styles.sliderValueText}>{selectedCurrency.symbol}250k+</Text>
             </View>
           </View>
 
@@ -353,6 +393,11 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     marginBottom: 8,
   },
+  helperText: {
+    fontSize: 12,
+    color: COLORS.secondary,
+    marginBottom: 12,
+  },
   input: {
     backgroundColor: COLORS.white,
     borderWidth: 1,
@@ -434,33 +479,72 @@ const styles = StyleSheet.create({
     gap: 16,
     marginBottom: 24,
   },
+  currencyOptionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
+  },
+  currencyOptionButton: {
+    minWidth: 64,
+    height: 36,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  currencyOptionButtonActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  currencyOptionText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  currencyOptionTextActive: {
+    color: COLORS.white,
+  },
   salaryInputGroup: {
     flex: 1,
+  },
+  salaryHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
   },
   salarySubLabel: {
     fontSize: 12,
     color: COLORS.secondary,
-    marginBottom: 4,
   },
-  currencyInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  salaryCurrencyBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primary,
+    backgroundColor: '#EBF1FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  salaryInput: {
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.outline,
     borderRadius: 8,
     paddingHorizontal: 12,
-    height: 44,
-  },
-  currencySymbol: {
-    fontSize: 15,
-    color: COLORS.secondary,
-    marginRight: 4,
-  },
-  salaryTextInput: {
-    flex: 1,
+    height: 48,
     fontSize: 15,
     color: COLORS.onSurface,
+  },
+  salaryPreviewText: {
+    marginTop: 12,
+    fontSize: 13,
+    color: COLORS.primary,
+    fontWeight: '600',
   },
   sliderContainer: {
     height: 24,

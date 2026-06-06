@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  RefreshControl,
   StyleSheet,
   View,
   Text,
@@ -47,6 +48,8 @@ const JobSeekerHome = ({ navigation }) => {
   const [savedJobs, setSavedJobs] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [jobs, setJobs] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -64,7 +67,7 @@ const JobSeekerHome = ({ navigation }) => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [refreshKey]);
 
   useEffect(() => {
     const unsubscribe = subscribeToOpenJobs(
@@ -73,7 +76,7 @@ const JobSeekerHome = ({ navigation }) => {
     );
 
     return unsubscribe;
-  }, []);
+  }, [refreshKey]);
 
   const savedJobIds = useMemo(() => new Set(savedJobs.map((job) => job.id)), [savedJobs]);
   const featuredJob = jobs[0] ?? null;
@@ -112,6 +115,22 @@ const JobSeekerHome = ({ navigation }) => {
     navigation.navigate(screenName);
   };
 
+  const handleRefresh = async () => {
+    if (refreshing) {
+      return;
+    }
+
+    setRefreshing(true);
+
+    try {
+      const storedSavedJobs = await getSavedJobs();
+      setSavedJobs(storedSavedJobs);
+      setRefreshKey((current) => current + 1);
+    } finally {
+      setTimeout(() => setRefreshing(false), 600);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <SidebarMenu
@@ -128,14 +147,20 @@ const JobSeekerHome = ({ navigation }) => {
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
           <Text style={styles.logoText}>Career Go</Text>
-        <TouchableOpacity>
-          <MaterialCommunityIcons name="notifications-outline" size={4} color={COLORS.primary} />
-        </TouchableOpacity>
+        <View style={{ width: 24 }} />
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 128 + insets.bottom }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
       >
         {/* Search Bar */}
         <View style={styles.searchContainer}>
