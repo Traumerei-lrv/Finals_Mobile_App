@@ -4,6 +4,7 @@ import {
   Dimensions,
   Image,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,9 +15,8 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
-import BottomNav, { BOTTOM_NAV_BASE_HEIGHT } from '../components/BottomNav';
+import BottomNav from '../components/BottomNav';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
 import SidebarMenu from '../components/SidebarMenu';
 import {
@@ -38,6 +38,7 @@ import {
   subscribeToOpenJobs,
 } from '../utils/jobsFirestore';
 import { FEATURED_HOME_JOB, SEARCH_RECOMMENDED_JOBS } from '../data/jobs';
+import { signOutFromAllProviders } from '../utils/authProviders';
 import { useAuthContext } from '../context/AuthContext';
 
 const { width } = Dimensions.get('window');
@@ -96,8 +97,6 @@ function getTabFromRoute(route) {
 
 export default function JobSeekerDashboard({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const bottomNavPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 12);
-  const bottomNavHeight = BOTTOM_NAV_BASE_HEIGHT + bottomNavPadding;
   const { user, userProfile } = useAuthContext();
   const [activeTab, setActiveTab] = useState(() => getTabFromRoute(route));
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -119,6 +118,8 @@ export default function JobSeekerDashboard({ navigation, route }) {
   });
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const nextTab = getTabFromRoute(route);
@@ -140,7 +141,7 @@ export default function JobSeekerDashboard({ navigation, route }) {
     );
 
     return unsubscribe;
-  }, []);
+  }, [refreshKey]);
 
   useEffect(() => {
     let isMounted = true;
@@ -171,7 +172,7 @@ export default function JobSeekerDashboard({ navigation, route }) {
       isMounted = false;
       focusUnsubscribe();
     };
-  }, [navigation]);
+  }, [navigation, refreshKey]);
 
   useEffect(() => {
     const applicantId = auth.currentUser?.uid ?? null;
@@ -184,7 +185,7 @@ export default function JobSeekerDashboard({ navigation, route }) {
     });
 
     return unsubscribe;
-  }, []);
+  }, [refreshKey]);
 
   useEffect(() => {
     const displayName =
@@ -323,12 +324,32 @@ export default function JobSeekerDashboard({ navigation, route }) {
   const handleLogoutConfirm = async () => {
     setLogoutLoading(true);
     try {
-      await signOut(auth);
+      await signOutFromAllProviders();
     } catch (error) {
       console.error('Logout error', error);
     } finally {
       setLogoutLoading(false);
       setLogoutModalVisible(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (refreshing) {
+      return;
+    }
+
+    setRefreshing(true);
+
+    try {
+      const [storedSavedJobs, storedSearches] = await Promise.all([
+        getSavedJobs(),
+        getRecentSearches(),
+      ]);
+      setSavedJobs(storedSavedJobs);
+      setRecentSearches(storedSearches.length ? storedSearches : DEFAULT_RECENT_SEARCHES);
+      setRefreshKey((current) => current + 1);
+    } finally {
+      setTimeout(() => setRefreshing(false), 600);
     }
   };
 
@@ -357,14 +378,20 @@ export default function JobSeekerDashboard({ navigation, route }) {
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.logoText}>Career Go</Text>
-        <TouchableOpacity>
-          <MaterialCommunityIcons name="bell-outline" size={22} color={COLORS.primary} />
-        </TouchableOpacity>
+        <View style={{ width: 24 }} />
       </View>
 
       <View style={styles.contentArea}>
         <KeyboardAwareScrollView
           style={styles.flex}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={COLORS.primary}
+              colors={[COLORS.primary]}
+            />
+          }
           enableOnAndroid
           enableAutomaticScroll
           extraHeight={Platform.OS === 'ios' ? 24 : 112}
@@ -427,11 +454,6 @@ export default function JobSeekerDashboard({ navigation, route }) {
           ) : null}
         </KeyboardAwareScrollView>
 
-        {activeTab === 'home' ? (
-          <TouchableOpacity style={[styles.fab, { bottom: bottomNavHeight + 14 }]}>
-            <MaterialCommunityIcons name="pencil-outline" size={24} color={COLORS.white} />
-          </TouchableOpacity>
-        ) : null}
       </View>
 
         <BottomNav
@@ -1527,21 +1549,6 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 14,
     fontWeight: '700',
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
   },
   searchHeader: {
     padding: 20,

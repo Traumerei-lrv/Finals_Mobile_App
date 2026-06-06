@@ -62,6 +62,7 @@ function normalizeJob(raw, id) {
     company,
     location,
     salary,
+    salaryCurrency: raw?.salaryCurrency ?? 'USD',
     salaryPeriod: raw?.salaryPeriod ?? '/ year',
     type,
     tags,

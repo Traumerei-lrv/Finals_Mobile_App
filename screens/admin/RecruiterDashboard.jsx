@@ -3,7 +3,9 @@ import {
   Alert,
   Dimensions,
   Image,
+  Modal,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,7 +16,6 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { signOut } from 'firebase/auth';
 import RecruiterBottomNav, { RECRUITER_BOTTOM_NAV_BASE_HEIGHT } from '../../components/RecruiterBottomNav';
 import RecruiterSidebarMenu from '../../components/RecruiterSidebarMenu';
 import LogoutConfirmModal from '../../components/LogoutConfirmModal';
@@ -26,6 +27,7 @@ import {
   deleteRecruiterJobPosting,
 } from '../../utils/jobsFirestore';
 import { subscribeToRecruiterApplications } from '../../utils/applicationsFirestore';
+import { signOutFromAllProviders } from '../../utils/authProviders';
 
 const { width } = Dimensions.get('window');
 
@@ -48,6 +50,13 @@ const COLORS = {
   closedTagText: '#5F6368',
   danger: '#D32F2F',
 };
+
+const CURRENCY_OPTIONS = [
+  { code: 'USD', symbol: '$', label: 'USD' },
+  { code: 'EUR', symbol: 'EUR', label: 'EUR' },
+  { code: 'GBP', symbol: 'GBP', label: 'GBP' },
+  { code: 'PHP', symbol: 'PHP', label: 'PHP' },
+];
 
 const MAIN_TABS = ['home', 'post_job', 'applicants', 'profile'];
 
@@ -90,12 +99,17 @@ export default function RecruiterDashboard({ navigation, route }) {
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [creatingJob, setCreatingJob] = useState(false);
   const [deletingJobId, setDeletingJobId] = useState(null);
+  const [deleteJobModalVisible, setDeleteJobModalVisible] = useState(false);
+  const [pendingDeleteJob, setPendingDeleteJob] = useState(null);
   const [workMode, setWorkMode] = useState('Hybrid');
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [formData, setFormData] = useState({
     jobTitle: '',
     companyName: 'Velocity Corp',
     industry: 'Information Technology',
     location: 'New York, NY (or Global)',
+    salaryCurrency: 'USD',
     minSalary: '120000',
     maxSalary: '160000',
     description: '',
@@ -123,7 +137,7 @@ export default function RecruiterDashboard({ navigation, route }) {
       unsubscribeJobs();
       unsubscribeApplications();
     };
-  }, []);
+  }, [refreshKey]);
 
   const applicantsByJobId = useMemo(() => {
     const grouped = {};
@@ -220,6 +234,17 @@ export default function RecruiterDashboard({ navigation, route }) {
     }).length;
   }, [applications]);
 
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      companyName: recruiterProfile?.company?.trim() || prev.companyName,
+      location:
+        prev.location === 'New York, NY (or Global)' && recruiterProfile?.location?.trim()
+          ? recruiterProfile.location.trim()
+          : prev.location,
+    }));
+  }, [recruiterProfile?.company, recruiterProfile?.location]);
+
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     if (tab !== 'applicants') {
@@ -244,11 +269,14 @@ export default function RecruiterDashboard({ navigation, route }) {
   };
 
   const buildSalaryLabel = () => {
+    const selectedCurrency =
+      CURRENCY_OPTIONS.find((option) => option.code === formData.salaryCurrency) ?? CURRENCY_OPTIONS[0];
+    const prefix = selectedCurrency.symbol;
     const min = formData.minSalary.trim();
     const max = formData.maxSalary.trim();
-    if (min && max) return `$${min} - $${max}`;
-    if (min) return `$${min}+`;
-    if (max) return `Up to $${max}`;
+    if (min && max) return `${prefix}${min} - ${prefix}${max}`;
+    if (min) return `${prefix}${min}+`;
+    if (max) return `Up to ${prefix}${max}`;
     return 'Competitive';
   };
 
@@ -258,18 +286,27 @@ export default function RecruiterDashboard({ navigation, route }) {
       company: formData.companyName.trim() || companyName,
       location: formData.location.trim() || 'Remote',
       type: workMode,
+      salaryCurrency: formData.salaryCurrency,
       salary: buildSalaryLabel(),
       about: formData.description.trim(),
       industry: formData.industry.trim(),
     }),
-    [companyName, formData.companyName, formData.description, formData.industry, formData.jobTitle, formData.location, formData.maxSalary, formData.minSalary, workMode],
+    [companyName, formData.companyName, formData.description, formData.industry, formData.jobTitle, formData.location, formData.maxSalary, formData.minSalary, formData.salaryCurrency, workMode],
   );
 
   const handleContinueToStep2 = () => {
+    if (creatingJob) {
+      return;
+    }
+
     navigation.navigate('PostJobStep2', { draft: draftPayload });
   };
 
   const handleQuickPostJob = async () => {
+    if (creatingJob) {
+      return;
+    }
+
     if (!formData.jobTitle.trim()) {
       Alert.alert('Missing title', 'Please enter a job title before posting.');
       return;
@@ -288,7 +325,7 @@ export default function RecruiterDashboard({ navigation, route }) {
         draft: draftPayload,
       });
 
-      navigation.navigate('PostJobSuccess', {
+      navigation.replace('PostJobSuccess', {
         postedJob: {
           id: jobId,
           role: draftPayload.role,
@@ -311,49 +348,78 @@ export default function RecruiterDashboard({ navigation, route }) {
       return;
     }
 
-    Alert.alert(
-      'Delete job posting',
-      `Delete "${job.role || job.title || 'this job'}"? This will also remove its related applications.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const recruiterId = auth.currentUser?.uid ?? null;
-            if (!recruiterId) {
-              Alert.alert('Sign in required', 'Please sign in again before deleting a job.');
-              return;
-            }
+    if (deletingJobId === job.id) {
+      return;
+    }
 
-            try {
-              setDeletingJobId(job.id);
-              await deleteRecruiterJobPosting({ recruiterId, jobId: job.id });
-              if (selectedJobId === job.id) {
-                setSelectedJobId(null);
-              }
-            } catch (error) {
-              console.error('Failed to delete recruiter job', error);
-              Alert.alert('Delete failed', error?.message || 'Unable to delete this job right now. Please try again.');
-            } finally {
-              setDeletingJobId((current) => (current === job.id ? null : current));
-            }
-          },
-        },
-      ],
-    );
+    setPendingDeleteJob(job);
+    setDeleteJobModalVisible(true);
+  };
+
+  const handleCancelDeleteJob = () => {
+    if (deletingJobId) {
+      return;
+    }
+
+    setDeleteJobModalVisible(false);
+    setPendingDeleteJob(null);
+  };
+
+  const handleConfirmDeleteJob = async () => {
+    const job = pendingDeleteJob;
+    if (!job?.id) {
+      setDeleteJobModalVisible(false);
+      setPendingDeleteJob(null);
+      return;
+    }
+
+    const recruiterId = auth.currentUser?.uid ?? null;
+    if (!recruiterId) {
+      setDeleteJobModalVisible(false);
+      setPendingDeleteJob(null);
+      Alert.alert('Sign in required', 'Please sign in again before deleting a job.');
+      return;
+    }
+
+    const jobTitle = job.role || job.title || 'this job';
+
+    try {
+      setDeletingJobId(job.id);
+      await deleteRecruiterJobPosting({ recruiterId, jobId: job.id });
+      if (selectedJobId === job.id) {
+        setSelectedJobId(null);
+      }
+      setDeleteJobModalVisible(false);
+      setPendingDeleteJob(null);
+      Alert.alert('Job deleted', `"${jobTitle}" was removed successfully.`);
+    } catch (error) {
+      console.error('Failed to delete recruiter job', error);
+      Alert.alert('Delete failed', error?.message || 'Unable to delete this job right now. Please try again.');
+    } finally {
+      setDeletingJobId((current) => (current === job.id ? null : current));
+    }
   };
 
   const handleLogoutConfirm = async () => {
     setLogoutLoading(true);
     try {
-      await signOut(auth);
+      await signOutFromAllProviders();
     } catch (error) {
       console.error('Recruiter logout failed', error);
     } finally {
       setLogoutLoading(false);
       setLogoutModalVisible(false);
     }
+  };
+
+  const handleRefresh = () => {
+    if (refreshing) {
+      return;
+    }
+
+    setRefreshing(true);
+    setRefreshKey((current) => current + 1);
+    setTimeout(() => setRefreshing(false), 600);
   };
 
   const headerTitle =
@@ -382,9 +448,7 @@ export default function RecruiterDashboard({ navigation, route }) {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{headerTitle}</Text>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.iconButton}>
-            <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
-          </TouchableOpacity>
+          <View style={{ width: 24 }} />
           <View style={styles.profileAvatarPlaceholder}>
             <Text style={styles.avatarInitial}>{initials}</Text>
           </View>
@@ -394,6 +458,14 @@ export default function RecruiterDashboard({ navigation, route }) {
       <View style={styles.contentArea}>
         <KeyboardAwareScrollView
           style={styles.flex}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={COLORS.primary}
+              colors={[COLORS.primary]}
+            />
+          }
           enableOnAndroid
           enableAutomaticScroll
           extraHeight={Platform.OS === 'ios' ? 24 : 124}
@@ -474,6 +546,19 @@ export default function RecruiterDashboard({ navigation, route }) {
         loading={logoutLoading}
         onCancel={() => setLogoutModalVisible(false)}
         onConfirm={handleLogoutConfirm}
+      />
+
+      <DeleteJobConfirmModal
+        visible={deleteJobModalVisible}
+        job={pendingDeleteJob}
+        applicantsCount={
+          pendingDeleteJob?.id
+            ? applicantsCountByJobId[pendingDeleteJob.id] ?? pendingDeleteJob.applicants ?? 0
+            : 0
+        }
+        loading={Boolean(deletingJobId && pendingDeleteJob?.id === deletingJobId)}
+        onCancel={handleCancelDeleteJob}
+        onConfirm={handleConfirmDeleteJob}
       />
     </SafeAreaView>
   );
@@ -565,6 +650,17 @@ function PostJobTab({
   onContinue,
   onQuickPost,
 }) {
+  const selectedCurrency =
+    CURRENCY_OPTIONS.find((option) => option.code === formData.salaryCurrency) ?? CURRENCY_OPTIONS[0];
+  const salaryPreview =
+    formData.minSalary.trim() && formData.maxSalary.trim()
+      ? `${selectedCurrency.symbol}${formData.minSalary.trim()} - ${selectedCurrency.symbol}${formData.maxSalary.trim()}`
+      : formData.minSalary.trim()
+        ? `${selectedCurrency.symbol}${formData.minSalary.trim()}+`
+        : formData.maxSalary.trim()
+          ? `Up to ${selectedCurrency.symbol}${formData.maxSalary.trim()}`
+          : 'Competitive';
+
   return (
     <>
       <View style={styles.progressHeader}>
@@ -628,32 +724,54 @@ function PostJobTab({
 
       <View style={styles.formCard}>
         <Text style={styles.label}>Salary Range (Annual)</Text>
+        <Text style={styles.helperText}>Choose the currency before entering the salary range.</Text>
+        <View style={styles.currencyOptionRow}>
+          {CURRENCY_OPTIONS.map((option) => {
+            const isActive = formData.salaryCurrency === option.code;
+            return (
+              <TouchableOpacity
+                key={option.code}
+                style={[styles.currencyOptionButton, isActive && styles.currencyOptionButtonActive]}
+                onPress={() => setFormData({ ...formData, salaryCurrency: option.code })}
+              >
+                <Text style={[styles.currencyOptionText, isActive && styles.currencyOptionTextActive]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
         <View style={styles.salaryRow}>
           <View style={styles.salaryInputGroup}>
-            <Text style={styles.salarySubLabel}>Min</Text>
-            <View style={styles.currencyInput}>
-              <Text style={styles.currencySymbol}>$</Text>
-              <TextInput
-                style={styles.salaryTextInput}
-                keyboardType="numeric"
-                value={formData.minSalary}
-                onChangeText={(text) => setFormData({ ...formData, minSalary: text })}
-              />
+            <View style={styles.salaryHeaderRow}>
+              <Text style={styles.salarySubLabel}>Min</Text>
+              <Text style={styles.salaryCurrencyBadge}>{selectedCurrency.label}</Text>
             </View>
+            <TextInput
+              style={styles.salaryInput}
+              keyboardType="numeric"
+              placeholder="e.g. 120000"
+              placeholderTextColor={COLORS.secondary}
+              value={formData.minSalary}
+              onChangeText={(text) => setFormData({ ...formData, minSalary: text.replace(/[^0-9]/g, '') })}
+            />
           </View>
           <View style={styles.salaryInputGroup}>
-            <Text style={styles.salarySubLabel}>Max</Text>
-            <View style={styles.currencyInput}>
-              <Text style={styles.currencySymbol}>$</Text>
-              <TextInput
-                style={styles.salaryTextInput}
-                keyboardType="numeric"
-                value={formData.maxSalary}
-                onChangeText={(text) => setFormData({ ...formData, maxSalary: text })}
-              />
+            <View style={styles.salaryHeaderRow}>
+              <Text style={styles.salarySubLabel}>Max</Text>
+              <Text style={styles.salaryCurrencyBadge}>{selectedCurrency.label}</Text>
             </View>
+            <TextInput
+              style={styles.salaryInput}
+              keyboardType="numeric"
+              placeholder="e.g. 160000"
+              placeholderTextColor={COLORS.secondary}
+              value={formData.maxSalary}
+              onChangeText={(text) => setFormData({ ...formData, maxSalary: text.replace(/[^0-9]/g, '') })}
+            />
           </View>
         </View>
+        <Text style={styles.salaryPreviewText}>Preview: {salaryPreview}</Text>
       </View>
 
       <Text style={styles.sectionLabel}>JOB DESCRIPTION & REQUIREMENTS</Text>
@@ -684,7 +802,11 @@ function PostJobTab({
       </View>
 
       <View style={styles.postActions}>
-        <TouchableOpacity style={styles.continueButton} onPress={onContinue}>
+        <TouchableOpacity
+          style={[styles.continueButton, creatingJob && styles.continueButtonDisabled]}
+          onPress={onContinue}
+          disabled={creatingJob}
+        >
           <Text style={styles.continueButtonText}>Continue to Step 2</Text>
           <MaterialCommunityIcons name="arrow-right" size={20} color={COLORS.white} />
         </TouchableOpacity>
@@ -974,6 +1096,52 @@ function ControlLink({ icon, label, isLast, onPress }) {
         <Text style={styles.controlLabel}>{label}</Text>
       </View>
     </TouchableOpacity>
+  );
+}
+
+function DeleteJobConfirmModal({ visible, job, applicantsCount = 0, loading = false, onCancel, onConfirm }) {
+  const jobTitle = job?.role || job?.title || 'this job';
+  const applicantsMessage =
+    applicantsCount > 0
+      ? `${applicantsCount} applicant${applicantsCount === 1 ? '' : 's'} linked to this job will also be removed from your recruiter inbox.`
+      : 'No applicants are linked to this job yet.';
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <View style={styles.deleteModalBackdrop}>
+        <View style={styles.deleteModalCard}>
+          <View style={styles.deleteModalIconWrap}>
+            <MaterialCommunityIcons name="trash-can-outline" size={28} color={COLORS.danger} />
+          </View>
+
+          <Text style={styles.deleteModalTitle}>Delete job posting</Text>
+          <Text style={styles.deleteModalMessage}>
+            {`"${jobTitle}" will be removed. This action cannot be undone.`}
+          </Text>
+          <Text style={styles.deleteModalSubmessage}>{applicantsMessage}</Text>
+
+          <View style={styles.deleteModalActions}>
+            <TouchableOpacity
+              style={styles.deleteModalCancelButton}
+              onPress={onCancel}
+              disabled={loading}
+            >
+              <Text style={styles.deleteModalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.deleteModalConfirmButton, loading && styles.deleteModalConfirmButtonDisabled]}
+              onPress={onConfirm}
+              disabled={loading}
+            >
+              <Text style={styles.deleteModalConfirmText}>
+                {loading ? 'Deleting...' : 'Delete Job'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -1360,37 +1528,81 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.onSurface,
   },
+  helperText: {
+    fontSize: 12,
+    color: COLORS.secondary,
+    marginBottom: 12,
+  },
   salaryRow: {
     flexDirection: 'row',
     gap: 16,
   },
+  currencyOptionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
+  },
+  currencyOptionButton: {
+    minWidth: 64,
+    height: 36,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  currencyOptionButtonActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  currencyOptionText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  currencyOptionTextActive: {
+    color: COLORS.white,
+  },
   salaryInputGroup: {
     flex: 1,
+  },
+  salaryHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
   },
   salarySubLabel: {
     fontSize: 12,
     color: COLORS.secondary,
-    marginBottom: 4,
   },
-  currencyInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  salaryCurrencyBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primary,
+    backgroundColor: '#EBF1FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  salaryInput: {
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.outline,
     borderRadius: 8,
     paddingHorizontal: 12,
-    height: 44,
-  },
-  currencySymbol: {
-    fontSize: 15,
-    color: COLORS.secondary,
-    marginRight: 4,
-  },
-  salaryTextInput: {
-    flex: 1,
+    height: 48,
     fontSize: 15,
     color: COLORS.onSurface,
+  },
+  salaryPreviewText: {
+    marginTop: 12,
+    fontSize: 13,
+    color: COLORS.primary,
+    fontWeight: '600',
   },
   editorToolbar: {
     flexDirection: 'row',
@@ -1430,6 +1642,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 12,
+  },
+  continueButtonDisabled: {
+    opacity: 0.7,
   },
   continueButtonText: {
     color: COLORS.white,
@@ -1756,5 +1971,87 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: COLORS.white,
+  },
+  deleteModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(10, 24, 48, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  deleteModalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+    padding: 24,
+  },
+  deleteModalIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: '#FDECEC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 18,
+    alignSelf: 'center',
+  },
+  deleteModalTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.primary,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  deleteModalMessage: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: COLORS.secondary,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  deleteModalSubmessage: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: COLORS.secondary,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  deleteModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  deleteModalCancelButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+  },
+  deleteModalCancelText: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  deleteModalConfirmButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: COLORS.danger,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteModalConfirmButtonDisabled: {
+    opacity: 0.8,
+  },
+  deleteModalConfirmText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

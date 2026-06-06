@@ -97,9 +97,7 @@ const PostJobStep2Screen = ({ navigation, route }) => {
           </TouchableOpacity>
           <Text style={styles.headerLogo}>Career Go</Text>
         </View>
-        <TouchableOpacity>
-          <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
-        </TouchableOpacity>
+        <View style={{ width: 24 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>

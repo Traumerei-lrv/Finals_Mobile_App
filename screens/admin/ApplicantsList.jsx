@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Modal,
+  RefreshControl,
   StyleSheet,
   View,
   Text,
@@ -34,6 +35,8 @@ const ApplicantsListScreen = ({ navigation, route }) => {
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     setSelectedJobId(route?.params?.jobId ?? null);
@@ -56,7 +59,7 @@ const ApplicantsListScreen = ({ navigation, route }) => {
       unsubscribeJobs();
       unsubscribeApps();
     };
-  }, []);
+  }, [refreshKey]);
 
   const applicationsByJobId = useMemo(() => {
     const grouped = {};
@@ -97,6 +100,16 @@ const ApplicantsListScreen = ({ navigation, route }) => {
 
   const selectedJob = useMemo(() => jobs.find((job) => job.id === selectedJobId) ?? null, [jobs, selectedJobId]);
 
+  const handleRefresh = () => {
+    if (refreshing) {
+      return;
+    }
+
+    setRefreshing(true);
+    setRefreshKey((current) => current + 1);
+    setTimeout(() => setRefreshing(false), 600);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <RecruiterSidebarMenu
@@ -118,12 +131,22 @@ const ApplicantsListScreen = ({ navigation, route }) => {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
+      >
         {!selectedJobId ? (
           <>
             <View style={styles.listHeader}>
               <Text style={styles.title}>Posted Jobs</Text>
-              <Text style={styles.subtitle}>Tap a job card to view and manage its applicants.</Text>
             </View>
 
             <View style={styles.applicantsList}>

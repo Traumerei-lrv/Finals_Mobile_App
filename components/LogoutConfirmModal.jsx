@@ -26,7 +26,7 @@ export default function LogoutConfirmModal({ visible, onCancel, onConfirm, loadi
             <MaterialCommunityIcons name="logout" size={28} color={COLORS.danger} />
           </View>
 
-          <Text style={styles.title}>Log out?</Text>
+          <Text style={styles.title}>Log out</Text>
           <Text style={styles.message}>
             You are about to sign out of Career Go. You will need to sign in again to access your account.
           </Text>

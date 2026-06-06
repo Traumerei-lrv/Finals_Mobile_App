@@ -2,11 +2,11 @@ import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase';
 import AdminSidebarMenu from '../../components/AdminSidebarMenu';
 import LogoutConfirmModal from '../../components/LogoutConfirmModal';
 import { useAuthContext } from '../../context/AuthContext';
+import { signOutFromAllProviders } from '../../utils/authProviders';
 
 const COLORS = {
   primary: '#1a365d',
@@ -77,7 +77,7 @@ export default function AdminProfile({ navigation }) {
   async function handleLogoutConfirm() {
     setLogoutLoading(true);
     try {
-      await signOut(auth);
+      await signOutFromAllProviders();
     } catch (error) {
       console.error('Admin logout failed', error);
     } finally {

@@ -2,6 +2,7 @@ import React from 'react';
 import { useState } from 'react';
 import { useEffect, useMemo } from 'react';
 import {
+  RefreshControl,
   StyleSheet,
   View,
   Text,
@@ -14,12 +15,12 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import RecruiterBottomNav from '../../components/RecruiterBottomNav';
-import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase';
 import LogoutConfirmModal from '../../components/LogoutConfirmModal';
 import { useAuthContext } from '../../context/AuthContext';
 import { subscribeToRecruiterJobs } from '../../utils/jobsFirestore';
 import { subscribeToRecruiterApplications } from '../../utils/applicationsFirestore';
+import { signOutFromAllProviders } from '../../utils/authProviders';
 
 const { width } = Dimensions.get('window');
 
@@ -44,6 +45,8 @@ const CompanyAccountProfileScreen = ({ navigation }) => {
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const recruiterName =
     recruiterProfile?.fullName ||
     userProfile?.fullName ||
@@ -79,7 +82,7 @@ const CompanyAccountProfileScreen = ({ navigation }) => {
       unsubscribeJobs();
       unsubscribeApplications();
     };
-  }, []);
+  }, [refreshKey]);
 
   const totalActiveJobs = useMemo(
     () => jobs.filter((job) => String(job?.status ?? 'open').toLowerCase() !== 'closed').length,
@@ -100,13 +103,23 @@ const CompanyAccountProfileScreen = ({ navigation }) => {
   const handleLogoutConfirm = async () => {
     setLogoutLoading(true);
     try {
-      await signOut(auth);
+      await signOutFromAllProviders();
     } catch (error) {
       console.error('Recruiter logout failed', error);
     } finally {
       setLogoutLoading(false);
       setLogoutModalVisible(false);
     }
+  };
+
+  const handleRefresh = () => {
+    if (refreshing) {
+      return;
+    }
+
+    setRefreshing(true);
+    setRefreshKey((current) => current + 1);
+    setTimeout(() => setRefreshing(false), 600);
   };
 
   return (
@@ -118,16 +131,25 @@ const CompanyAccountProfileScreen = ({ navigation }) => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Career Go</Text>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.iconButton}>
-            <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
-          </TouchableOpacity>
+          <View style={{ width: 24 }} />
           <View style={styles.profileAvatarPlaceholder}>
             <Text style={styles.avatarInitial}>{initials}</Text>
           </View>
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
+      >
         {/* Company Hero Section */}
         <View style={styles.profileHero}>
           <View style={styles.companyLogoContainerMain}>

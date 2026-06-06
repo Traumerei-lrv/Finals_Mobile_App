@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  RefreshControl,
   StyleSheet,
   View,
   Text,
@@ -39,6 +40,8 @@ const RecruiterDashboardNoAIScreen = ({ navigation }) => {
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { isAdmin } = useAuthContext();
 
   useEffect(() => {
@@ -58,7 +61,7 @@ const RecruiterDashboardNoAIScreen = ({ navigation }) => {
       unsubscribeJobs();
       unsubscribeApplications();
     };
-  }, []);
+  }, [refreshKey]);
 
   const applicantsByJobId = useMemo(() => {
     const grouped = {};
@@ -77,6 +80,16 @@ const RecruiterDashboardNoAIScreen = ({ navigation }) => {
 
   const recentJobs = useMemo(() => jobs.slice(0, 6), [jobs]);
 
+  const handleRefresh = () => {
+    if (refreshing) {
+      return;
+    }
+
+    setRefreshing(true);
+    setRefreshKey((current) => current + 1);
+    setTimeout(() => setRefreshing(false), 600);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <RecruiterSidebarMenu
@@ -93,16 +106,25 @@ const RecruiterDashboardNoAIScreen = ({ navigation }) => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Career Go</Text>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.iconButton}>
-            <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
-          </TouchableOpacity>
+          <View style={{ width: 24 }} />
           <View style={styles.profileAvatarPlaceholder}>
             <MaterialCommunityIcons name="account" size={24} color={COLORS.primary} />
           </View>
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
+      >
         {/* Recruitment Overview */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recruitment Overview</Text>

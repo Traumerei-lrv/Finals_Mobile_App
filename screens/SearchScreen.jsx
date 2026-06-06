@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  RefreshControl,
   StyleSheet,
   View,
   Text,
@@ -50,6 +51,7 @@ const SearchJobsScreen = ({navigation, route}) => {
   const [recentSearches, setRecentSearches] = useState(DEFAULT_RECENT_SEARCHES);
   const [savedJobs, setSavedJobs] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (route?.params?.query) {
@@ -136,6 +138,25 @@ const SearchJobsScreen = ({navigation, route}) => {
     navigation.navigate(routeName);
   };
 
+  const handleRefresh = async () => {
+    if (refreshing) {
+      return;
+    }
+
+    setRefreshing(true);
+
+    try {
+      const [storedSearches, storedSavedJobs] = await Promise.all([
+        getRecentSearches(),
+        getSavedJobs(),
+      ]);
+      setRecentSearches(storedSearches.length ? storedSearches : DEFAULT_RECENT_SEARCHES);
+      setSavedJobs(storedSavedJobs);
+    } finally {
+      setTimeout(() => setRefreshing(false), 600);
+    }
+  };
+
   const recommendedJobs = useMemo(() => {
     if (!search.trim()) {
       return SEARCH_RECOMMENDED_JOBS.slice(0, 9);
@@ -160,12 +181,21 @@ const SearchJobsScreen = ({navigation, route}) => {
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.logoText}>Career Go</Text>
-        <TouchableOpacity>
-          <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
-        </TouchableOpacity>
+        <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
+      >
         {/* Search Header */}
         <View style={styles.searchHeader}>
           <View style={styles.searchInputWrapper}>

@@ -97,9 +97,7 @@ const EditCompanyProfileScreen = ({ navigation }) => {
           <Text style={styles.headerTitle}>Edit Company Profile</Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.iconButton}>
-            <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
-          </TouchableOpacity>
+          <View style={{ width: 24 }} />
           <View style={styles.profileAvatarPlaceholder}>
              <Image 
                source={{ uri: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200' }} 

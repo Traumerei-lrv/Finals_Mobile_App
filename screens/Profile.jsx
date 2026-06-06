@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  RefreshControl,
   StyleSheet,
   View,
   Text,
@@ -11,7 +12,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import {
   getSavedJobs,
@@ -21,6 +21,7 @@ import SidebarMenu from '../components/SidebarMenu';
 import LogoutConfirmModal from '../components/LogoutConfirmModal';
 import { subscribeToApplicantApplications } from '../utils/applicationsFirestore';
 import { useAuthContext } from '../context/AuthContext';
+import { signOutFromAllProviders } from '../utils/authProviders';
 
 
 const { width } = Dimensions.get('window');
@@ -55,6 +56,8 @@ const ProfileScreen = ({navigation}) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -79,7 +82,7 @@ const ProfileScreen = ({navigation}) => {
       isMounted = false;
       focusUnsubscribe();
     };
-  }, [navigation]);
+  }, [navigation, refreshKey]);
 
   useEffect(() => {
     const displayName =
@@ -109,7 +112,7 @@ const ProfileScreen = ({navigation}) => {
     });
 
     return unsubscribe;
-  }, []);
+  }, [refreshKey]);
 
   const avatarSource = useMemo(
     () => ({ uri: buildProfileAvatarUrl(profile.fullName || 'Career Go User') }),
@@ -126,12 +129,28 @@ const ProfileScreen = ({navigation}) => {
   const handleLogoutConfirm = async () => {
     setLogoutLoading(true);
     try {
-      await signOut(auth);
+      await signOutFromAllProviders();
     } catch (error) {
       console.error('Logout error', error);
     } finally {
       setLogoutLoading(false);
       setLogoutModalVisible(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (refreshing) {
+      return;
+    }
+
+    setRefreshing(true);
+
+    try {
+      const savedJobs = await getSavedJobs();
+      setSavedCount(savedJobs.length);
+      setRefreshKey((current) => current + 1);
+    } finally {
+      setTimeout(() => setRefreshing(false), 600);
     }
   };
 
@@ -150,12 +169,21 @@ const ProfileScreen = ({navigation}) => {
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.logoText}>Career Go</Text>
-        <TouchableOpacity>
-          <MaterialCommunityIcons name="notifications-outline" size={24} color={COLORS.primary} />
-        </TouchableOpacity>
+        <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
+      >
         {/* Profile Header */}
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
