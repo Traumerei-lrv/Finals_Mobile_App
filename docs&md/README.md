@@ -20,3 +20,13 @@ The app also includes location-based job searching, Firebase Authentication, Fir
 - HR approval and rejection workflow
 - Admin user management
 - Responsive mobile UI using React Native and Expo
+
+## Auth Docs
+
+- [Google Sign-In + Firebase Auth Setup Guide](./GOOGLE_SIGNIN_FIREBASE_SETUP_GUIDE.md)
+- [Google Sign-In + Firebase Auth Troubleshooting Guide](./GOOGLE_SIGNIN_FIREBASE_TROUBLESHOOTING.md)
+- [How We Resolve the Google Sign-In Problems We Faced](./GOOGLE_SIGNIN_FIREBASE_RESOLUTION_NOTES.md)
+
+## Build Docs
+
+- [Build Guide](./BUILD_GUIDE.md)
