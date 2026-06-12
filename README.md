@@ -1,11 +1,11 @@
-# Career Go
+# Example Mobile App
 
-Career Go is an IT-focused job finder app with three user roles:
+This sample mobile app supports three user roles:
 - Job Seeker
 - Recruiter
 - Admin
 
-For job seekers, Career Go helps you discover IT opportunities, browse job details, and track your applications in one place.
+For job seekers, the app helps users discover opportunities, browse job details, and track their applications in one place.
 
 ## Setup Guide
 
@@ -90,20 +90,20 @@ npx expo start --go --clear
 ## Demo Credentials
 
 ### Admin
-- Email: `admin@gmail.com`
-- Password: `password`
+- Email: `admin@example.com`
+- Password: `sample-password`
 
 ### Job Seeker
-- Email: `alvin@gmail.com`
-- Password: `password123`
+- Email: `jobseeker@example.com`
+- Password: `sample-password`
 
 ### Recruiter
-- Email: `hart@gmail.com`
-- Password: `password`
+- Email: `recruiter@example.com`
+- Password: `sample-password`
 
 ### Recruiter
-- Email: `cloudbridege@gmail.com`
-- Password: `password`
+- Email: `recruiter2@example.com`
+- Password: `sample-password`
 
 ## Troubleshooting
 

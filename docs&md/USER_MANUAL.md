@@ -1,8 +1,8 @@
-# Career Go User Manual
+# Example App User Manual
 
 ## 1. Overview
 
-Career Go is a role-based job finder application built for three user groups:
+This sample role-based application is documented for three user groups:
 
 - Job Seeker
 - Recruiter
@@ -226,4 +226,4 @@ If a signed-in account is marked inactive in the database, the app may immediate
 
 ## 10. Document Purpose
 
-This manual is intended to give teammates, testers, and stakeholders a structured reference for how users interact with Career Go.
+This manual is intended to give teammates, testers, and stakeholders a structured reference for how users interact with the sample app.
