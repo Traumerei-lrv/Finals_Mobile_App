@@ -16,7 +16,7 @@ Sample reference configuration:
 We use three build modes:
 
 1. Development build for native feature testing
-2. Preview build for a shareable Android APK
+2. Preview build for the app builds we share internally
 3. Production build for release output
 
 Why this matters:
@@ -24,6 +24,7 @@ Why this matters:
 - Google Sign-In on mobile needs a real native build.
 - Expo Go is not enough for this app's native Google auth flow.
 - EAS is already configured in this repo through [eas.json](../eas.json).
+- Per Expo's EAS Build profile model, our standard shareable app build uses the `preview` profile in `eas.json`.
 
 ## 2. Prerequisites
 
@@ -107,13 +108,15 @@ This is the build flow we should treat as the default for mobile auth testing.
 
 ## 7. Preview build workflow
 
-Use this when you want a shareable Android build for testers.
+This is the build path we use when building the app for internal sharing and tester installs.
 
 Build the preview APK:
 
 ```bash
 npx eas build --platform android --profile preview
 ```
+
+In team shorthand, this means we build the app with the EAS `preview` profile.
 
 Why preview is useful:
 
@@ -198,7 +201,7 @@ The safest team workflow is:
 1. Update `.env`
 2. Verify Firebase and Google config
 3. Build `development` for auth testing
-4. Use `preview` for Android tester installs
+4. Build the app with EAS `preview` for Android tester installs
 5. Use `production` only when the native auth flow is already verified
 
 ## 13. Related docs
