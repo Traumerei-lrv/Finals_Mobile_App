@@ -14,6 +14,7 @@ import {
   saveStoredAuthUser,
 } from './utils/storage';
 import { AuthProvider } from './context/AuthContext';
+import { ensureUserProfile } from './utils/ensureUserProfile';
 
 const Stack = createNativeStackNavigator();
 const getAdminDashboard = () => require('./screens/admin/AdminDashboard').default;
@@ -83,7 +84,7 @@ export default function App() {
           // Read role from Firestore users/{uid}
           const userRef = doc(db, 'users', u.uid);
           const userSnap = await getDoc(userRef);
-          const userData = userSnap.exists() ? userSnap.data() : null;
+          const userData = userSnap.exists() ? userSnap.data() : await ensureUserProfile(u, 'job_seeker');
           if (userData?.active === false) {
             await signOut(auth);
             setRole(null);

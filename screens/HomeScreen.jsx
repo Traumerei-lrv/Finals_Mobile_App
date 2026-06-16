@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  RefreshControl,
   StyleSheet,
   View,
   Text,
@@ -48,8 +47,6 @@ const JobSeekerHome = ({ navigation }) => {
   const [savedJobs, setSavedJobs] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [jobs, setJobs] = useState([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -67,7 +64,7 @@ const JobSeekerHome = ({ navigation }) => {
     return () => {
       isMounted = false;
     };
-  }, [refreshKey]);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeToOpenJobs(
@@ -76,7 +73,7 @@ const JobSeekerHome = ({ navigation }) => {
     );
 
     return unsubscribe;
-  }, [refreshKey]);
+  }, []);
 
   const savedJobIds = useMemo(() => new Set(savedJobs.map((job) => job.id)), [savedJobs]);
   const featuredJob = jobs[0] ?? null;
@@ -115,22 +112,6 @@ const JobSeekerHome = ({ navigation }) => {
     navigation.navigate(screenName);
   };
 
-  const handleRefresh = async () => {
-    if (refreshing) {
-      return;
-    }
-
-    setRefreshing(true);
-
-    try {
-      const storedSavedJobs = await getSavedJobs();
-      setSavedJobs(storedSavedJobs);
-      setRefreshKey((current) => current + 1);
-    } finally {
-      setTimeout(() => setRefreshing(false), 600);
-    }
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <SidebarMenu
@@ -147,20 +128,14 @@ const JobSeekerHome = ({ navigation }) => {
           <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
         </TouchableOpacity>
           <Text style={styles.logoText}>Career Go</Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity>
+          <MaterialCommunityIcons name="notifications-outline" size={4} color={COLORS.primary} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 128 + insets.bottom }]}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={COLORS.primary}
-            colors={[COLORS.primary]}
-          />
-        }
       >
         {/* Search Bar */}
         <View style={styles.searchContainer}>
@@ -278,7 +253,30 @@ const JobSeekerHome = ({ navigation }) => {
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* Premium Banner */}
+        <View style={styles.premiumBanner}>
+          <Image
+            source={{ uri: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=2070&auto=format&fit=crop' }}
+            style={styles.premiumImage}
+          />
+          <View style={styles.premiumContent}>
+            <View style={styles.premiumBadge}><Text style={styles.premiumBadgeText}>PREMIUM</Text></View>
+            <Text style={styles.premiumTitle}>Stand out with AI-powered resume analysis</Text>
+            <Text style={styles.premiumDescription}>Our premium members get 3x more recruiter views with tailored suggestions for their job .</Text>
+            <TouchableOpacity style={styles.premiumButton}>
+              <Text style={styles.premiumButtonText}>Upgrade to Premium</Text>
+              <MaterialCommunityIcons name="lightning-bolt" size={18} color={COLORS.white} />
+            </TouchableOpacity>
+          </View>
+        </View>
       </ScrollView>
+
+      {/* Floating Action Button */}
+      <TouchableOpacity style={[styles.fab, { bottom: 96 + insets.bottom }]}>
+        <MaterialCommunityIcons name="pencil-outline" size={24} color={COLORS.white} />
+      </TouchableOpacity>
+
       {/* Bottom Nav Bar */}
       <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 12), minHeight: 82 + insets.bottom }]}>
         <TouchableOpacity style={styles.navItemActive} onPress={() => navigation.navigate('Home')}>

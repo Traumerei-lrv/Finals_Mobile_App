@@ -25,6 +25,7 @@ import { auth } from '../../firebase';
 import { db } from '../../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { clearStaleNativeGoogleSession, signOutFromAllProviders } from '../../utils/authProviders';
+import { ensureUserProfile } from '../../utils/ensureUserProfile';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -75,8 +76,10 @@ const ReactNativeLogin = ({ navigation }) => {
   };
 
   const validateSignedInUser = async (signedInUser) => {
-    const profileSnap = await getDoc(doc(db, 'users', signedInUser.uid));
-    const profile = profileSnap.exists() ? profileSnap.data() : null;
+    const existingProfileSnap = await getDoc(doc(db, 'users', signedInUser.uid));
+    const existingProfile = existingProfileSnap.exists() ? existingProfileSnap.data() : null;
+
+    const profile = existingProfile ?? await ensureUserProfile(signedInUser, 'job_seeker');
 
     if (profile?.active === false) {
       await signOutFromAllProviders();
